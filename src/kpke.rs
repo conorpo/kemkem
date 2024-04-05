@@ -3,29 +3,23 @@ use crate::params::*;
 use crate::polynomial::*;
 use crate::sample::*;
 
-pub fn KeyGen(params: MlKemParams) -> (Vec<u8>, Vec<u8>) {
+pub fn KeyGen<const k: usize>() -> (Matrix<Polynomial>, Vector<Polynomial>, Vector<Polynomial>) {
     let d = crypt::random_bytes(32);
     let (rho, sigma) = crypt::G(d);
 
     let mut N = 0;
 
     // Our public key, the bad bases
-    let mut A: Vec<Vec<Polynomial>> = Vec::new();
+    let mut A: Matrix<k> = Matrix::new(PolynomialType::NTT);
 
-    for i in 0..params.k {
-        let mut row = Vec::new();
-        for j in 0..params.k {
-            //row.push(SampleNTT(crypt::XOF))
+    for i in 0..k {
+        for j in 0..k {
+            A.data[i][j] = SampleNTT(XOF::new(rho, i, j)) // XOF stream is instantied here for each index of the matrix
         }
-    
     }
 
-    let A: Matrix<Polynomial> = Matrix {
-        data: A
-    };
-
     // Our secret key
-    let mut S: Vec<Polynomial> = Vec::new();
+    let mut S: Vec<k> = Vec::new(PolynomialType::Ring);
     for i in 0..params.k {
         S.push( match params.eta_1 {
             2 => SamplePolyCBD_2(PRF_2(sigma, N)),
@@ -34,14 +28,10 @@ pub fn KeyGen(params: MlKemParams) -> (Vec<u8>, Vec<u8>) {
         });
         N += 1;
     }
-    
-    let S: Vector<Polynomial> = Vector {
-        data: S
-    };
 
 
     // Our error vector
-    let mut E: Vec<Polynomial> = Vec::new();
+    let mut E: Vec<k> = Vec::new(PolynomialType::Ring);
 
     for i in 0..params.k {
         E.push( match params.eta_2 {
@@ -52,18 +42,12 @@ pub fn KeyGen(params: MlKemParams) -> (Vec<u8>, Vec<u8>) {
         N += 1;
     }
 
-    let E: Vector<Polynomial> = Vector {
-        data: E
-    };
-
     // NTT both
     let S = S.NTT();
     let E = E.NTT();
 
     let T = A.vector_multiply(&S).add(&E);
-    
-    
 
-    reutrn 
-    
+    todo!() // byte encode (t)||p and s   
+    //(t||p) is the encapsulation key, s is the secret (decapsulation) key
 }

@@ -44,6 +44,7 @@ pub fn SamplePolyCBD_2 (byte_array: [u8; 128]) -> Polynomial {
     f
 }
 
+// possible make samplepolycbd use a const generic
 pub fn SamplePolyCBD_3 (byte_array: [u8; 192]) -> Polynomial {
     let b = bytes_to_bits(byte_array);
 

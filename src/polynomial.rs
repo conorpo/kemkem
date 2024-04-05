@@ -1,11 +1,19 @@
-pub enum Polynomial {
-    Ring([u16; 256]),
-    NTT([u16; 256]),
+pub enum PolynomialType {
+    Ring,
+    NTT
+}
+
+pub struct Polynomial {
+    data: [u16; 256],
+    t: PolynomialType
 }
 
 impl Polynomial {
-    pub fn new() -> Polynomial {
-        Polynomial::Ring([0; 256])
+    pub fn new(t: PolynomialType) -> Polynomial {
+        Polynomial {
+            data: [0; 256],
+            t: t
+        }
     }
 
     pub fn scalar_add(&mut self, value: u16) {
@@ -26,7 +34,7 @@ impl Polynomial {
         }
     }
 
-    pub fn ntt(&mut self) -> Polynomial::NTT {
+    pub fn ntt(&mut self) -> Polynomial {
         if let Polynomial::Ring(data) = self {
             let mut ntt_data = [0; 256];
             for i in 0..256 {
@@ -34,13 +42,17 @@ impl Polynomial {
                     ntt_data[i] = (ntt_data[i] + data[j] * W[i * j % 256]) % 3329;
                 }
             }
-            Polynomial::NTT(ntt_data)
+
+            Polynomial {
+                data: ntt_data,
+                t: PolynomialType::NTT
+            }
         } else {
             panic!("Polynomial is not in Ring form");
         }
     }
 
-    pub fn inverse_ntt(&mut self) -> Polynomial::Ring {
+    pub fn inverse_ntt(&mut self) -> Polynomial {
         if let Polynomial::NTT(data) = self {
             let mut ring_data = [0; 256];
             for i in 0..256 {
@@ -48,7 +60,11 @@ impl Polynomial {
                     ring_data[i] = (ring_data[i] + data[j] * W[(256 - i) * j % 256]) % 3329;
                 }
             }
-            Polynomial::Ring(ring_data)
+
+            Polynomial {
+                data: ring_data,
+                t: PolynomialType::Ring
+            }
         } else {
             panic!("Polynomial is not in NTT form");
         }
@@ -56,72 +72,58 @@ impl Polynomial {
 }
 
 //Tuple that is either all ring or all ntt, k is length
-pub struct Vector<Type: Polynomial,k: usize> {
-    data: [Type; k]
+pub struct Vector<const k: usize> {
+    data: [Polynomial; k]
 }
 
-impl<Type: Polynomial,k: usize> Vector<Type,k> {
-    pub fn new() -> Vector<Type,k> {
+impl<const k: usize> Vector<k> { 
+    pub fn new(t: PolynomialType) -> Vector<k> {
         Vector {
-            data: [Type::new(); k]
+            data: [Polynomial::new(t); k]
         }
     }
 
-    pub fn add(&mut self, other: &Vector<Type,k>) {
+    pub fn add(&mut self, other: &Vector<k>) -> Vector<k> {
+        let mut result = Vector::new(self.data[0].t);
         for i in 0..k {
-            self.data[i].add(&other.data[i]);
+            result.data[i].add(&other.data[i]);
         }
+        result
     }
 
-    pub fn inner_product(&self, other: &Vector<Type,k>) -> Type {
-        let mut result = Type::new();
+    pub fn inner_product(&self, other: &Vector<k>) -> Polynomial {
+        let mut result = Polynomial::new(self.data[0].t);
         for i in 0..k {
             result.add(&self.data[i].mul(&other.data[i]));
         }
         result
     }
-}
 
-pub struct Matrix<T: Polynomial> {
-    data: Vec<Vec<T>>
-}
-
-impl<Type: Polynomial Matrix<T> {
-    pub fn new(k: usize) -> Matrix<T> {
-        Matrix {
-            data: vec![vec![T::new(); k]; k]
-        }
-    }
-
-    pub fn vector_multiply(&self, vector: &Vector<Type,k>) -> Vector<Type,k> {
-        let mut result = Vector::new();
+    pub fn NTT(&self) -> Vector<k> {
+        let mut result: Vector<k> = Vector::new(PolynomialType::NTT);
         for i in 0..k {
-            for j in 0..k {
-                result.data[i].add(&self.data[i][j].mul(&vector.data[j]));
-            }
+            result.data[i] = self.data[i].ntt();
         }
         result
     }
 }
 
-static ka: usize = 256;
+pub struct Matrix<const k: usize> {
+    data: [[Polynomial; k]; k]
+}
 
-pub struct TestMatrix {
-    data: [[u16; ka]; ka]
-};
-
-impl TestMatrix {
-    pub fn new() -> TestMatrix {
-        TestMatrix {
-            data: [[0; ka]; ka]
+impl<const k: usize> Matrix<k> {
+    pub fn new(t: PolynomialType) -> Matrix<k> {
+        Matrix {
+            data: [[Polynomial::new(t); k]; k]
         }
     }
 
-    pub fn vector_multiply(&self, vector: &TestVector) -> TestVector {
-        let mut result = TestVector::new();
-        for i in 0..ka {
-            for j in 0..ka {
-                result.data[i] = (result.data[i] + self.data[i][j] * vector.data[j]) % 3329;
+    pub fn vector_multiply(&self, vector: &Vector<k>) -> Vector<k> {
+        let mut result = Vector::new(self.data[0][0].t);
+        for i in 0..k {
+            for j in 0..k {
+                result.data[i].add(&self.data[i][j].mul(&vector.data[j]));
             }
         }
         result
