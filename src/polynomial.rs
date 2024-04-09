@@ -1,10 +1,11 @@
+#[derive(Clone, Copy)]
 pub enum PolynomialType {
     Ring,
     NTT
 }
 
 pub struct Polynomial {
-    data: [u16; 256],
+    pub data: [u16; 256],
     t: PolynomialType
 }
 
@@ -79,7 +80,7 @@ pub struct Vector<const k: usize> {
 impl<const k: usize> Vector<k> { 
     pub fn new(t: PolynomialType) -> Vector<k> {
         Vector {
-            data: [Polynomial::new(t); k]
+            data: core::array::from_fn(|_| Polynomial::new(t))
         }
     }
 
@@ -109,7 +110,7 @@ impl<const k: usize> Vector<k> {
 }
 
 pub struct Matrix<const k: usize> {
-    data: [[Polynomial; k]; k]
+    pub data: [[Polynomial; k]; k]
 }
 
 impl<const k: usize> Matrix<k> {

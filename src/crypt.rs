@@ -2,9 +2,9 @@ use sha3::{Sha3_512, Sha3_256, Digest, Shake256, Shake128, digest::{ExtendableOu
 use rand::{RngCore, SeedableRng};
 use rand::rngs::StdRng;
 
-pub fn random_bytes(n: usize) -> Vec<u8> {
+pub fn random_bytes<const n: usize> () -> [u8; n] {
     let mut rng = StdRng::from_entropy();
-    let mut res = vec![0u8; n];
+    let mut res = [0u8; n];
     rng.fill_bytes(&mut res);
     res
 }
@@ -74,7 +74,7 @@ impl XOF {
 
     pub fn get_3_bytes(&mut self) -> [u8; 3] {
         let mut res = [0u8; 3];
-        self.reader.read(&mut res).unwrap();
+        self.reader.read(&mut res);
         res
     }
 }

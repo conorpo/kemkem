@@ -1,26 +1,27 @@
 use crate::polynomial::*;
 use crate::params;
+use crate::crypt;
 
-pub fn SampleNTT(xof_stream: crypt::XOF) -> Polynomial::NTT {
+pub fn SampleNTT(mut xof_stream: crypt::XOF) -> Polynomial {
     let mut i = 0;
     let mut j = 0;
 
-    let mut a: Polynomial::NTT = Polynomial::NTT([0; 256]);
+    let mut a: Polynomial = Polynomial::new(PolynomialType::NTT);
 
     while j < 256 {
         //Each iteration samples 3 unfiormly random bytes total
-        let 3_bytes = xof_stream.get_3_bytes();
+        let three_bytes = xof_stream.get_3_bytes();
 
-        let d1 = 3_bytes[0] as u16 + 256 * (3_bytes[1] % 16) as u16; // Uniform random sample of 12 bits
-        let d2 = 3_bytes[1] as u16 / 16 + 16 * 3_bytes[2] as u16; // Uniform random sample of 12 bits
+        let d1 = three_bytes[0] as u16 + 256 * (three_bytes[1] % 16) as u16; // Uniform random sample of 12 bits
+        let d2 = three_bytes[1] as u16 / 16 + 16 * three_bytes[2] as u16; // Uniform random sample of 12 bits
 
-        if d_1 < params::Q {
-            a[j] = d1;
+        if d1 < params::Q {
+            a.data[j] = d1;
             j += 1;
         }
 
         if d2 < params::Q && j < 256 {
-            a[j] = d2;
+            a.data[j] = d2;
             j += 1;
         }
 
