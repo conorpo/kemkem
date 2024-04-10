@@ -43,11 +43,25 @@ impl<params: MlKemParams> TestRunner<params> where
     [(); 64 * params::eta_1]: ,
     [(); 384 * params::k + 32]:
 {
-    fn simulate() => None {
+    fn simulate() -> Option<()> {
         let (ek, dk) = mlkem::key_gen::<params>();
 
         todo!();
+        test;
+        
+        None
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_512_params() {
+        let (ek, dk) = mlkem::key_gen::<params::MlKem512>();
+        assert_eq!(ek.len(), 384*2 + 32);
+    }
 }
 

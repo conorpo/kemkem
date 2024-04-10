@@ -36,11 +36,10 @@ pub fn J(s: Vec<u8>) -> [u8; 32] {
     res
 }
 
-pub fn prf<const eta: usize>(s: [u8; 32], b: u8) -> [u8; 64 * eta] 
-    where [u8; 64 * eta]: 
+pub fn prf<const eta: usize>(s: &[u8; 32], b: u8) -> [u8; 64 * eta] 
 {
     let mut hasher = Shake256::default();
-    hasher.update(&s);
+    hasher.update(s);
     hasher.update(&[b]);
     
     let mut reader = hasher.finalize_xof();
