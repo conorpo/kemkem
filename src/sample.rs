@@ -1,12 +1,13 @@
 use crate::polynomial::*;
 use crate::params;
 use crate::crypt;
+use crate::bits::*;
 
-pub fn SampleNTT(mut xof_stream: crypt::XOF) -> Polynomial {
+pub fn sample_ntt(mut xof_stream: crypt::XOF) -> Ring {
     let mut i = 0;
     let mut j = 0;
 
-    let mut a: Polynomial = Polynomial::new(PolynomialType::NTT);
+    let mut a: Ring = Ring::new(RingRepresentation::NTT);
 
     while j < 256 {
         //Each iteration samples 3 unfiormly random bytes total
@@ -31,30 +32,24 @@ pub fn SampleNTT(mut xof_stream: crypt::XOF) -> Polynomial {
     a
 }
 
-pub fn SamplePolyCBD_2 (byte_array: [u8; 128]) -> Polynomial {
-    let b = bytes_to_bits(byte_array);
+pub fn sample_poly_cbd<const eta: usize>(byte_array: [u8; 64*eta]) -> Ring 
+    where [u8; 64*eta]:
+{
+    todo!(); //maybe bitvec?
+    let b: &[] = bytes_to_bits(byte_array);
 
-    let mut f: Polynomial = Polynomial::Ring([0; 256]);
+    let mut f: Ring = Ring::new(RingRepresentation::Degree255);
 
-    for i in 0..256 {
-        let x = b[4*i] + b[4*i + 1];
-        let y = b[4*i + 2] + b[4*i + 3];
-        f[i] = (x - y) % params::Q;
-    }
-
-    f
-}
-
-// possible make samplepolycbd use a const generic
-pub fn SamplePolyCBD_3 (byte_array: [u8; 192]) -> Polynomial {
-    let b = bytes_to_bits(byte_array);
-
-    let mut f: Polynomial = Polynomial::Ring([0; 256]);
+    b.chunks(eta);
 
     for i in 0..256 {
-        let x = b[6*i] + b[6*i + 1] + b[6*i + 2];
-        let y = b[6*i + 3] + b[6*i + 4] + b[6*i + 5];
-        f[i] = (x - y) % params::Q;
+        let mut x = 0;
+        let mut y = 0;
+        for j in 0..eta {
+            x += b[2*eta*i + j];
+            y += b[2*eta*i + j + eta];
+        }
+        f.data[i] = (x - y) % params::Q;
     }
 
     f

@@ -9,53 +9,46 @@ pub fn random_bytes<const n: usize> () -> [u8; n] {
     res
 }
 
-pub fn G(c: Vec<u8>) -> ([u8; 32], [u8; 32]) {
+pub fn G<const L: usize>(c: [u8; L]) -> ([u8; 32], [u8; 32]) {
     let mut hasher = Sha3_512::new();
-    hasher.update(&c);
-    let mut output = [0u8; 64];
-    hasher.finalize();
+    Digest::update(&mut hasher, &c);
+    let output = hasher.finalize();
 
-    let (a, b) = output.split_at(32).unwrap();
+    let (a,b) = output.split_at(32);
+    (a.try_into().unwrap(), b.try_into().unwrap())
 }
 
 pub fn H(s: Vec<u8>) -> [u8; 32] {
     let mut hasher = Sha3_256::new();
-    hasher.update(&s);
+    Digest::update(&mut hasher, &s);
     let output = hasher.finalize();
-    output
+
+    output.try_into().unwrap()
 }
 
 pub fn J(s: Vec<u8>) -> [u8; 32] {
     let mut hasher = Shake256::default();
     hasher.update(&s);
-
     let mut reader = hasher.finalize_xof();
+
     let mut res = [0u8; 32];
-    reader.read(&mut res).unwrap();
+    reader.read(&mut res);
     res
 }
 
-pub fn prf_2(s: [u8; 32], b: u8) -> [u8; 128] {
+pub fn prf<const eta: usize>(s: [u8; 32], b: u8) -> [u8; 64 * eta] 
+    where [u8; 64 * eta]: 
+{
     let mut hasher = Shake256::default();
-    hasher.update(s.to_be_bytes());
-    hasher.update(b);
+    hasher.update(&s);
+    hasher.update(&[b]);
     
     let mut reader = hasher.finalize_xof();
-    let mut res = [0u8; 128];
-    reader.read(&mut res).unwrap();
+    let mut res = [0u8; 64 * eta];
+    reader.read(&mut res);
     res
 }
 
-pub fn prf_3(s: [u8; 32], b: u8) -> [u8; 192] {
-    let mut hasher = Shake128::default();
-    hasher.update(s.to_be_bytes());
-    hasher.update(b);
-    
-    let mut reader = hasher.finalize_xof();
-    let mut res = [0u8; 192];
-    reader.read(&mut res).unwrap();
-    res
-}
 
 pub struct XOF {
     reader: Shake128Reader
@@ -64,9 +57,9 @@ pub struct XOF {
 impl XOF {
     pub fn new(p: [u8; 32], i: u8, j: u8) -> XOF {
         let mut hasher = Shake128::default();
-        hasher.update(p.to_be_bytes());
-        hasher.update(i);
-        hasher.update(j);
+        hasher.update(&p);
+        hasher.update(&[i]);
+        hasher.update(&[j]);
         XOF {
             reader: hasher.finalize_xof()
         }

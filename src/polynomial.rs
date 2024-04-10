@@ -1,17 +1,19 @@
+use crate::params;
+
 #[derive(Clone, Copy)]
-pub enum PolynomialType {
-    Ring,
+pub enum RingRepresentation {
+    Degree255,
     NTT
 }
 
-pub struct Polynomial {
+pub struct Ring {
     pub data: [u16; 256],
-    t: PolynomialType
+    t: RingRepresentation
 }
 
-impl Polynomial {
-    pub fn new(t: PolynomialType) -> Polynomial {
-        Polynomial {
+impl Ring {
+    pub fn new(t: RingRepresentation) -> Ring {
+        Ring {
             data: [0; 256],
             t: t
         }
@@ -29,14 +31,34 @@ impl Polynomial {
         }
     }
 
-    pub fn add(&mut self, other: &Polynomial) {
+    pub fn add(&mut self, other: &Ring) {
         for i in 0..256 {
             self.data[i] = (self.data[i] + other.data[i]) % 3329;
         }
     }
 
-    pub fn ntt(&mut self) -> Polynomial {
-        if let Polynomial::Ring(data) = self {
+    pub fn mult(a_ring: &Ring, b_ring: &Ring) -> Ring {
+        if let (
+            Ring { data: a, t: RingRepresentation::NTT }, 
+            Ring { data: b, t: RingRepresentation::NTT }
+        ) = (a_ring, b_ring) {
+                let mut result = Ring::new(RingRepresentation::NTT);
+
+                for i in 0..128 {
+                    let gamma = params::Zeta.pow(2); //replace with the bitrev thing
+
+                    result.data[2*i] = (a[2*i] * b[2*i] + gamma * a[2*i + 1] * b[2*i + 1]) % 3329;
+                    result.data[2*i + 1] = (a[2*i] * b[2*i + 1] + a[2*i + 1] * b[2*i]) % 3329;
+                }
+
+                return result;
+        } else {
+            panic!("Both rings must be in NTT form");
+        }
+    }
+
+    pub fn ntt(&mut self) -> Ring {
+        if let Ring { data, t: RingRepresentation::Degree255 } = self{
             let mut ntt_data = [0; 256];
             for i in 0..256 {
                 for j in 0..256 {
@@ -44,16 +66,16 @@ impl Polynomial {
                 }
             }
 
-            Polynomial {
+            return Ring {
                 data: ntt_data,
-                t: PolynomialType::NTT
+                t: RingRepresentation::NTT
             }
         } else {
-            panic!("Polynomial is not in Ring form");
+            panic!("Ring is not in Degree255 form");
         }
     }
 
-    pub fn inverse_ntt(&mut self) -> Polynomial {
+    pub fn inverse_ntt(&mut self) -> Ring {
         if let Polynomial::NTT(data) = self {
             let mut ring_data = [0; 256];
             for i in 0..256 {
@@ -74,13 +96,13 @@ impl Polynomial {
 
 //Tuple that is either all ring or all ntt, k is length
 pub struct Vector<const k: usize> {
-    data: [Polynomial; k]
+    pub data: [Ring; k]
 }
 
 impl<const k: usize> Vector<k> { 
-    pub fn new(t: PolynomialType) -> Vector<k> {
+    pub fn new(t: RingRepresentation) -> Vector<k> {
         Vector {
-            data: core::array::from_fn(|_| Polynomial::new(t))
+            data: core::array::from_fn(|_| Ring::new(t))
         }
     }
 
@@ -92,8 +114,8 @@ impl<const k: usize> Vector<k> {
         result
     }
 
-    pub fn inner_product(&self, other: &Vector<k>) -> Polynomial {
-        let mut result = Polynomial::new(self.data[0].t);
+    pub fn inner_product(&self, other: &Vector<k>) -> Ring {
+        let mut result = Ring::new(self.data[0].t);
         for i in 0..k {
             result.add(&self.data[i].mul(&other.data[i]));
         }

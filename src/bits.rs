@@ -1,5 +1,5 @@
 use bitvec::prelude::*;
-use crate::polynomial::Polynomial;
+use crate::polynomial::*;
 
 pub struct Encoded<const d: usize> where
     [u8; 32*d]: { // Garuntees that the array is not over the max size

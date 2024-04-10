@@ -12,7 +12,12 @@ struct DecapsulationKey<const k: usize> where
 }
 
 // ML-KEM.KeyGen
-pub fn key_gen<PARAMS: MlKemParams> () -> ([u8; 384*PARAMS::k + 32], DecapsulationKey::<{PARAMS::k}>) {
+pub fn key_gen<PARAMS: MlKemParams> () -> ([u8; 384*PARAMS::k + 32], DecapsulationKey::<{PARAMS::k}>) where 
+    [(); PARAMS::eta_1]: ,
+    [(); PARAMS::eta_2]: ,
+    [(); 64 * PARAMS::eta_1]: ,
+    [(); 384 * PARAMS::k + 32]:
+{
     let z = crypt::random_bytes::<32>();
 
     //Encryption key, Decryption key
