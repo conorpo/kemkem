@@ -21,13 +21,13 @@ fn main() {
 
     match temp_param_set {
         "ML-KEM-512" => {
-            TestRunner::<params::ML_KEM_512>::simulate();
+            TestRunner::<params::MlKem512>::simulate();
         },
         "ML-KEM-768" => {
-            TestRunner::<params::ML_KEM_768>::simulate();
+            TestRunner::<params::MlKem768>::simulate();
         },
         "ML-KEM-1024" => {
-            TestRunner::<params::ML_KEM_1024>::simulate();
+            TestRunner::<params::MlKem1024>::simulate();
         },
         _ => {
             panic!("Invalid parameter set");
@@ -35,16 +35,16 @@ fn main() {
     }
 }
 
-struct TestRunner<Params: MlKemParams> {}
+struct TestRunner<params: MlKemParams> {}
 
-impl<Params: MlKemParams> TestRunner<Params> where
-    [(); Params::eta_1]: ,
-    [(); Params::eta_2]: ,
-    [(); 64 * Params::eta_1]: ,
-    [(); 384 * Params::k + 32]:
+impl<params: MlKemParams> TestRunner<params> where
+    [(); params::eta_1]: ,
+    [(); params::eta_2]: ,
+    [(); 64 * params::eta_1]: ,
+    [(); 384 * params::k + 32]:
 {
     fn simulate() => None {
-        let (ek, dk) = mlkem::key_gen::<Params>();
+        let (ek, dk) = mlkem::key_gen::<params>();
 
         todo!();
     }

@@ -11,6 +11,8 @@ pub struct Ring {
     t: RingRepresentation
 }
 
+// Most Ring operations are inplace
+
 impl Ring {
     pub fn new(t: RingRepresentation) -> Ring {
         Ring {
@@ -37,59 +39,90 @@ impl Ring {
         }
     }
 
-    pub fn mult(a_ring: &Ring, b_ring: &Ring) -> Ring {
+    pub fn mult(ring_a: &Ring, ring_b: &Ring) -> Ring {
         if let (
             Ring { data: a, t: RingRepresentation::NTT }, 
             Ring { data: b, t: RingRepresentation::NTT }
-        ) = (a_ring, b_ring) {
-                let mut result = Ring::new(RingRepresentation::NTT);
+        ) = (ring_a, ring_b) {
+            let mut result = Ring::new(RingRepresentation::NTT);
 
-                for i in 0..128 {
-                    let gamma = params::Zeta.pow(2); //replace with the bitrev thing
+            for i in 0..128 {
+                todo!();
+                let gamma = params::Zeta.pow(2); //replace with the bitrev thing
 
-                    result.data[2*i] = (a[2*i] * b[2*i] + gamma * a[2*i + 1] * b[2*i + 1]) % 3329;
-                    result.data[2*i + 1] = (a[2*i] * b[2*i + 1] + a[2*i + 1] * b[2*i]) % 3329;
-                }
-
-                return result;
+                result.data[2*i] = (a[2*i] * b[2*i] + gamma * a[2*i + 1] * b[2*i + 1]) % 3329;
+                result.data[2*i + 1] = (a[2*i] * b[2*i + 1] + a[2*i + 1] * b[2*i]) % 3329;
+            }
+            result
         } else {
             panic!("Both rings must be in NTT form");
         }
     }
 
-    pub fn ntt(&mut self) -> Ring {
-        if let Ring { data, t: RingRepresentation::Degree255 } = self{
-            let mut ntt_data = [0; 256];
-            for i in 0..256 {
-                for j in 0..256 {
-                    ntt_data[i] = (ntt_data[i] + data[j] * W[i * j % 256]) % 3329;
+    // In-Place, transforms ring to NTT form
+    pub fn ntt(&mut self) -> &mut Self{
+        if let Ring { data, t: RingRepresentation::Degree255 } = self {
+            let mut k = 1;
+            let mut len = 128;
+            while len >= 2 {
+                let mut start = 0;
+                while start < 256 {
+                    todo!();
+                    let zeta = params::Zeta.pow(k); 
+
+                    k += 1;
+
+                    for j in start..(start + len) {
+                        let t = (zeta * data[j + len]) % 3329;
+                        data[j + len] = (data[j] + 3329 - t) % 3329;
+                        data[j] = (data[j] + t) % 3329;
+                    }
+
+                    start += 2 * len;
                 }
+
+                len /= 2;
             }
 
-            return Ring {
-                data: ntt_data,
-                t: RingRepresentation::NTT
-            }
+            self.t = RingRepresentation::NTT;
+            
+            return self;
         } else {
-            panic!("Ring is not in Degree255 form");
+            panic!("Ring is already in NTT form");
         }
     }
 
-    pub fn inverse_ntt(&mut self) -> Ring {
-        if let Polynomial::NTT(data) = self {
-            let mut ring_data = [0; 256];
-            for i in 0..256 {
-                for j in 0..256 {
-                    ring_data[i] = (ring_data[i] + data[j] * W[(256 - i) * j % 256]) % 3329;
+    pub fn inverse_ntt(&mut self) -> &mut Self {
+        if let Ring { data, t: RingRepresentation::NTT } = self {
+            let mut k = 127;
+            let mut len = 2;
+            while len <= 128 {
+                let mut start = 0;
+                while start < 256 {
+                    todo!();
+                    let zeta = params::Zeta.pow(k); 
+
+                    k -= 1;
+
+                    for j in start..(start + len) {
+                        let t = data[j];
+                        data[j] = (data[j+len] + t) % 3329;
+                        data[j+len] = (zeta*(3329 + t - data[j+len])) % 3329;
+                    }
+
+                    start += 2 * len;
                 }
+
+                len *= 2;
             }
 
-            Polynomial {
-                data: ring_data,
-                t: PolynomialType::Ring
-            }
+            self.scalar_mul(3303);
+
+            self.t = RingRepresentation::Degree255;
+
+            return self;
         } else {
-            panic!("Polynomial is not in NTT form");
+            panic!("Ring is already in Degree255 form");
         }
     }
 }
@@ -106,7 +139,7 @@ impl<const k: usize> Vector<k> {
         }
     }
 
-    pub fn add(&mut self, other: &Vector<k>) -> Vector<k> {
+    pub fn add(&self, other: &Vector<k>) -> Vector<k> {
         let mut result = Vector::new(self.data[0].t);
         for i in 0..k {
             result.data[i].add(&other.data[i]);
@@ -117,36 +150,54 @@ impl<const k: usize> Vector<k> {
     pub fn inner_product(&self, other: &Vector<k>) -> Ring {
         let mut result = Ring::new(self.data[0].t);
         for i in 0..k {
-            result.add(&self.data[i].mul(&other.data[i]));
+            result.add(&Ring::mult(&self.data[i], &other.data[i]));
         }
         result
+    }   
+
+
+    // NTT and NTT^-1 are in place and chainable
+    pub fn ntt(&mut self) -> &mut Self {
+        for i in 0..k {
+            self.data[i].ntt();
+        }
+        self
     }
 
-    pub fn NTT(&self) -> Vector<k> {
-        let mut result: Vector<k> = Vector::new(PolynomialType::NTT);
+    pub fn inverse_ntt(&mut self) -> &mut Self {
         for i in 0..k {
-            result.data[i] = self.data[i].ntt();
+            self.data[i].inverse_ntt();
         }
-        result
+        self
     }
 }
 
 pub struct Matrix<const k: usize> {
-    pub data: [[Polynomial; k]; k]
+    pub data: [[Ring; k]; k]
 }
 
 impl<const k: usize> Matrix<k> {
-    pub fn new(t: PolynomialType) -> Matrix<k> {
+    pub fn new(t: RingRepresentation) -> Matrix<k> {
         Matrix {
-            data: [[Polynomial::new(t); k]; k]
+            data: core::array::from_fn(|_| core::array::from_fn(|_| Ring::new(t)))
         }
     }
 
-    pub fn vector_multiply(&self, vector: &Vector<k>) -> Vector<k> {
+    pub fn right_vector_multiply(&self, vector: &Vector<k>) -> Vector<k> {
         let mut result = Vector::new(self.data[0][0].t);
         for i in 0..k {
             for j in 0..k {
-                result.data[i].add(&self.data[i][j].mul(&vector.data[j]));
+                result.data[i].add(&Ring::mult(&self.data[i][j], &vector.data[j]));  
+            }
+        }
+        result
+    }
+
+    pub fn left_vector_multiply(&self, vector: &Vector<k>) -> Vector<k> {
+        let mut result = Vector::new(self.data[0][0].t);
+        for i in 0..k {
+            for j in 0..k {
+                result.data[i].add(&Ring::mult(&self.data[j][i], &vector.data[j]));
             }
         }
         result

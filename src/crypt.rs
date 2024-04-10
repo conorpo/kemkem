@@ -55,9 +55,9 @@ pub struct XOF {
 }
 
 impl XOF {
-    pub fn new(p: [u8; 32], i: u8, j: u8) -> XOF {
+    pub fn new(p: &[u8], i: u8, j: u8) -> XOF {
         let mut hasher = Shake128::default();
-        hasher.update(&p);
+        hasher.update(p);
         hasher.update(&[i]);
         hasher.update(&[j]);
         XOF {
