@@ -1,17 +1,24 @@
 use crate::crypt;
 use crate::params::*;
-use crate::polynomial::*;
+use crate::ring::*;
 use crate::sample;
 use crate::bits::*;
+use crate::serialize::{ByteDecode, BitOrder, Decompress};
 
+use bitvec::prelude::*;
 
-pub fn key_gen<PARAMS: MlKemParams>() -> (([Encoded<12>; PARAMS::k], [u8; 32]), Encoded<12>) where 
+pub type KPKE_EncryptionKey <const k: usize> = (Vector<{k}>, [u8; 32]);
+pub type KPKE_DecryptionKey <const k: usize> = Vector<{k}>;
+
+pub type KPKE_KeyGen_Output <const k: usize> = (KPKE_EncryptionKey<{k}>, KPKE_DecryptionKey<{k}>);
+
+pub fn key_gen<PARAMS: MlKemParams>() -> KPKE_KeyGen_Output<{PARAMS::k}> where
     [(); PARAMS::k]: ,
     [(); PARAMS::eta_2]: ,
     [(); 64 * PARAMS::eta_1]: ,
 {
     let d = crypt::random_bytes::<32>();
-    let (rho, sigma) = crypt::G::<32>(d);
+    let (rho, sigma) = crypt::G::<32>(&d);
 
     let mut n = 0;
 
@@ -20,43 +27,41 @@ pub fn key_gen<PARAMS: MlKemParams>() -> (([Encoded<12>; PARAMS::k], [u8; 32]), 
 
     for i in 0..PARAMS::k {
         for j in 0..PARAMS::k {
-            A.data[i][j] = sample::sample_ntt(crypt::XOF::new(rho, i as u8, j as u8)) // XOF stream is instantied here for each index of the matrix
+            A.data[i][j] = sample::sample_ntt(crypt::XOF::new(&rho, i as u8, j as u8)) // XOF stream is instantied here for each index of the matrix
         }
     }
 
     // Our secret key
-    let mut S = Vector::new(RingRepresentation::Degree255); //This is ugly, maybe use an iterator to make the polynomials, then collect them into a vector
+    let mut s = Vector::new(RingRepresentation::Degree255); //This is ugly, maybe use an iterator to make the polynomials, then collect them into a vector
     for i in 0..PARAMS::k {
-        S.data[i] = sample::sample_poly_cbd::<{PARAMS::eta_1}>(
-            crypt::prf::<{PARAMS::eta_1}>(sigma, n)
+        s.data[i] = sample::sample_poly_cbd::<{PARAMS::eta_1}>(
+            crypt::prf::<{PARAMS::eta_1}>(&sigma, n)
         );
         n += 1;
     }
 
 
     // Our error vector
-    let mut E = Vector::new(RingRepresentation::Degree255);
+    let mut e = Vector::new(RingRepresentation::Degree255);
     for i in 0..PARAMS::k {
-        E.data[i] = sample::sample_poly_cbd::<{PARAMS::eta_1}>(
-            crypt::prf::<{PARAMS::eta_1}>(sigma, n)
+        e.data[i] = sample::sample_poly_cbd::<{PARAMS::eta_1}>(
+            crypt::prf::<{PARAMS::eta_1}>(&sigma, n)
         );
         n += 1;
     }
 
     // NTT both
-    let S = S.ntt();
-    let E = E.ntt();
+    s.ntt();
+    e.ntt();
 
-    let T = A.right_vector_multiply(&S).add(&E);
+    let t = A.right_vector_multiply(&s).add(&e);
 
-
-    todo!();
-    //let mut ek_pke_t = [Encoded<12>; k];
-
-    //(t||p) is the encapsulation key, s is the secret (decapsulation) key
+    ((t, rho), s)
 }
 
-pub fn encrypt<PARAMS: MlKemParams>(ek_pke: [u8; 384*PARAMS::k+32], m: [u8; 32], rand: [u8; 32]) -> [u8; 32*(PARAMS::d_u * PARAMS::k + PARAMS::d_v)] where
+pub type Cyphertext<const k: usize> = (Vector<{k}>, Ring);
+
+pub fn encrypt<PARAMS: MlKemParams>(ek_pke: KPKE_EncryptionKey<{PARAMS::k}>, m: [u8; 32], rand: [u8; 32]) -> Cyphertext<{PARAMS::k}> where
     [(); PARAMS::k]: ,
     [(); 64 * PARAMS::eta_1]: ,
     [(); 64 * PARAMS::eta_2]: ,
@@ -64,13 +69,13 @@ pub fn encrypt<PARAMS: MlKemParams>(ek_pke: [u8; 384*PARAMS::k+32], m: [u8; 32],
 {
     let mut n = 0;
 
-    let (t, rho) = ek_pke.split_at(384*PARAMS::k); // rho is the seed for A, the matrix, t comes from KeyGen's computation with their secret
+    let (t, rho) = ek_pke; // rho is the seed for A, the matrix, t comes from KeyGen's computation with their secret
 
     // Recreate the matrix A
     let mut A: Matrix<{PARAMS::k}> = Matrix::new(RingRepresentation::NTT);
     for i in 0..PARAMS::k {
         for j in 0..PARAMS::k {
-            A.data[i][j] = sample::sample_ntt(crypt::XOF::new(rho, i as u8, j as u8));
+            A.data[i][j] = sample::sample_ntt(crypt::XOF::new(&rho, i as u8, j as u8));
         }
     }
 
@@ -101,19 +106,13 @@ pub fn encrypt<PARAMS: MlKemParams>(ek_pke: [u8; 384*PARAMS::k+32], m: [u8; 32],
 
     // u is the encryptors computation with A and their secret, but this one is left-multiplied
     let u = (A.left_vector_multiply(&r)).inverse_ntt().add(&e_1);
-    
-    todo!();
-    let Mu;
+
+    let mu = Decompress::<1>(&ByteDecode::<1>(m.view_bits::<BitOrder>())); // Our message is now a ring with elements 0 or q/2
 
     // v is our shared secret, notice for both parties its approximately rAs.
-    let v = (r.inner_product(&t)).inverse_ntt().add(&e_2);
+    let v = *(r.inner_product(&t)).inverse_ntt().add(&e_2).add(&mu);
 
-    let t = crypt::H(c);
-    let k = crypt::J(c);
-
-    let c = crypt::prf_2(t, 0);
-
-    (k, c)
+    (u, v)
 }
 
 pub fn decrypt<PARAMS: MlKemParams>(

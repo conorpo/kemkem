@@ -7,14 +7,16 @@ use kem::key_gen;
 
 use crypt::*;
 use params::MlKemParams;
+use serialize::MlKemSerialize;
 
 mod mlkem;
 mod crypt;
 mod bits;
 mod kpke;
 mod sample;
-mod polynomial;
+mod ring;
 mod params;
+mod serialize;
 
 fn main() {
     let temp_param_set = "ML-KEM-1024";
@@ -35,19 +37,19 @@ fn main() {
     }
 }
 
-struct TestRunner<params: MlKemParams> {}
+struct TestRunner<Params: MlKemParams> {}
 
-impl<params: MlKemParams> TestRunner<params> where
+impl<params: MlKemParams> TestRunner where
     [(); params::eta_1]: ,
     [(); params::eta_2]: ,
     [(); 64 * params::eta_1]: ,
-    [(); 384 * params::k + 32]:
+    [(); 384 * params::k + 32]: ,
+    [(); 798 * params::k + 96]: ,
 {
     fn simulate() -> Option<()> {
         let (ek, dk) = mlkem::key_gen::<params>();
 
-        todo!();
-        test;
+        let serialized_ek = ek.serialize();
         
         None
     }

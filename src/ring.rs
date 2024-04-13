@@ -6,9 +6,10 @@ pub enum RingRepresentation {
     NTT
 }
 
+#[derive(Clone, Copy)]
 pub struct Ring {
     pub data: [u16; 256],
-    t: RingRepresentation
+    pub t: RingRepresentation
 }
 
 // Most Ring operations are inplace
@@ -33,10 +34,11 @@ impl Ring {
         }
     }
 
-    pub fn add(&mut self, other: &Ring) {
+    pub fn add(&mut self, other: &Ring) -> &mut Self {
         for i in 0..256 {
             self.data[i] = (self.data[i] + other.data[i]) % 3329;
         }
+        self
     }
 
     pub fn mult(ring_a: &Ring, ring_b: &Ring) -> Ring {
@@ -92,7 +94,7 @@ impl Ring {
         }
     }
 
-    pub fn inverse_ntt(&mut self) -> &mut Self {
+    pub fn inverse_ntt(&mut self) -> Self {
         if let Ring { data, t: RingRepresentation::NTT } = self {
             let mut k = 127;
             let mut len = 2;
@@ -120,7 +122,7 @@ impl Ring {
 
             self.t = RingRepresentation::Degree255;
 
-            return self;
+            return *self;
         } else {
             panic!("Ring is already in Degree255 form");
         }
@@ -128,6 +130,7 @@ impl Ring {
 }
 
 //Tuple that is either all ring or all ntt, k is length
+#[derive(Clone, Copy)]
 pub struct Vector<const k: usize> {
     pub data: [Ring; k]
 }

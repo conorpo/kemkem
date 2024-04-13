@@ -1,4 +1,4 @@
-use crate::polynomial::*;
+use crate::ring::*;
 use crate::params;
 use crate::crypt;
 use crate::bits::*;

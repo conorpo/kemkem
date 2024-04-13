@@ -9,9 +9,9 @@ pub fn random_bytes<const n: usize> () -> [u8; n] {
     res
 }
 
-pub fn G<const L: usize>(c: [u8; L]) -> ([u8; 32], [u8; 32]) {
+pub fn G<const L: usize>(c: &[u8; L]) -> ([u8; 32], [u8; 32]) {
     let mut hasher = Sha3_512::new();
-    Digest::update(&mut hasher, &c);
+    Digest::update(&mut hasher, c);
     let output = hasher.finalize();
 
     let (a,b) = output.split_at(32);
