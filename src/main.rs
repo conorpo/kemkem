@@ -1,22 +1,18 @@
 #![feature(generic_const_exprs)]
 #![feature(adt_const_params)]
 
-const Q: i16 = 3329;
-
-use kem::key_gen;
-
 use crypt::*;
 use params::MlKemParams;
 use serialize::MlKemSerialize;
 
 mod mlkem;
 mod crypt;
-mod bits;
 mod kpke;
 mod sample;
 mod ring;
 mod params;
 mod serialize;
+mod util;
 
 fn main() {
     let temp_param_set = "ML-KEM-1024";

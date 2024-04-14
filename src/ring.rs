@@ -1,4 +1,4 @@
-use crate::params;
+use crate::{params, util};
 
 #[derive(Clone, Copy)]
 pub enum RingRepresentation {
@@ -24,19 +24,26 @@ impl Ring {
 
     pub fn scalar_add(&mut self, value: u16) {
         for i in 0..256 {
-            self.data[i] = (self.data[i] + value) % 3329;
+            self.data[i] = (self.data[i] + value) % params::Q;
         }
     }
     
     pub fn scalar_mul(&mut self, value: u16) {
         for i in 0..256 {
-            self.data[i] = (self.data[i] * value) % 3329;
+            self.data[i] = (self.data[i] * value) % params::Q;
         }
     }
 
     pub fn add(&mut self, other: &Ring) -> &mut Self {
         for i in 0..256 {
-            self.data[i] = (self.data[i] + other.data[i]) % 3329;
+            self.data[i] = (self.data[i] + other.data[i]) % params::Q;
+        }
+        self
+    }
+
+    pub fn sub(&mut self, other: &Ring) -> &mut Self {
+        for i in 0..256 {
+            self.data[i] = (self.data[i] + params::Q - other.data[i]) % params::Q;
         }
         self
     }
@@ -52,8 +59,8 @@ impl Ring {
                 todo!();
                 let gamma = params::Zeta.pow(2); //replace with the bitrev thing
 
-                result.data[2*i] = (a[2*i] * b[2*i] + gamma * a[2*i + 1] * b[2*i + 1]) % 3329;
-                result.data[2*i + 1] = (a[2*i] * b[2*i + 1] + a[2*i + 1] * b[2*i]) % 3329;
+                result.data[2*i] = (a[2*i] * b[2*i] + gamma * a[2*i + 1] * b[2*i + 1]) % params::Q;
+                result.data[2*i + 1] = (a[2*i] * b[2*i + 1] + a[2*i + 1] * b[2*i]) % params::Q;
             }
             result
         } else {
@@ -69,15 +76,14 @@ impl Ring {
             while len >= 2 {
                 let mut start = 0;
                 while start < 256 {
-                    todo!();
-                    let zeta = params::Zeta.pow(k); 
+                    let zeta = params::ZETA.pow(util::bitrev7(k) as u32) % params::Q;
 
                     k += 1;
 
                     for j in start..(start + len) {
-                        let t = (zeta * data[j + len]) % 3329;
-                        data[j + len] = (data[j] + 3329 - t) % 3329;
-                        data[j] = (data[j] + t) % 3329;
+                        let t = (zeta * data[j + len]) % params::Q;
+                        data[j + len] = (data[j] + params::Q - t) % params::Q;
+                        data[j] = (data[j] + t) % params::Q;
                     }
 
                     start += 2 * len;
@@ -101,15 +107,14 @@ impl Ring {
             while len <= 128 {
                 let mut start = 0;
                 while start < 256 {
-                    todo!();
-                    let zeta = params::Zeta.pow(k); 
+                    let zeta = params::ZETA.pow(util::bitrev7(k) as u32) % params::Q;
 
                     k -= 1;
 
                     for j in start..(start + len) {
                         let t = data[j];
-                        data[j] = (data[j+len] + t) % 3329;
-                        data[j+len] = (zeta*(3329 + t - data[j+len])) % 3329;
+                        data[j] = (data[j+len] + t) % params::Q;
+                        data[j+len] = (zeta*(params::Q + t - data[j+len])) % params::Q;
                     }
 
                     start += 2 * len;
@@ -126,6 +131,31 @@ impl Ring {
         } else {
             panic!("Ring is already in Degree255 form");
         }
+    }
+
+    pub fn compress(&mut self, d: usize) -> &mut Self {
+        for i in 0..256 {
+            self.data[i] = ((self.data[i] as u32) * 2u32.pow(d as u32) / params::Q) as u16;
+        }
+        self
+    }
+
+    pub fn decompress(&mut self, d: usize) -> &mut Self {
+        for i in 0..256 {
+            self.data[i] = ((self.data[i] as u32) * params::Q / 2u32.pow(d as u32)) as u16;
+        }
+        self
+    }    
+}
+
+impl PartialEq for Ring {
+    fn eq(&self, other: &Self) -> bool {
+        for i in 0..256 {
+            if self.data[i] != other.data[i] {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -172,6 +202,31 @@ impl<const k: usize> Vector<k> {
             self.data[i].inverse_ntt();
         }
         self
+    }
+
+    pub fn compress(&mut self, d: usize) -> &mut Self {
+        for i in 0..k {
+            self.data[i].compress(d);
+        }
+        self
+    }
+
+    pub fn decompress(&mut self, d: usize) -> &mut Self {
+        for i in 0..k {
+            self.data[i].decompress(d);
+        }
+        self
+    }
+}
+
+impl<const k: usize> PartialEq for Vector<k> {
+    fn eq(&self, other: &Self) -> bool {
+        for i in 0..k {
+            if self.data[i] != other.data[i] {
+                return false;
+            }
+        }
+        true
     }
 }
 

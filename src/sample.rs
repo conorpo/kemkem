@@ -1,7 +1,9 @@
 use crate::ring::*;
 use crate::params;
 use crate::crypt;
-use crate::bits::*;
+use crate::serialize::BitOrder;
+
+use bitvec::prelude::*;
 
 pub fn sample_ntt(mut xof_stream: crypt::XOF) -> Ring {
     let mut i = 0;
@@ -35,21 +37,20 @@ pub fn sample_ntt(mut xof_stream: crypt::XOF) -> Ring {
 pub fn sample_poly_cbd<const eta: usize>(byte_array: [u8; 64*eta]) -> Ring 
     where [u8; 64*eta]:
 {
-    todo!(); //maybe bitvec?
-    let b: &[] = bytes_to_bits(byte_array);
+    let b = byte_array.view_bits::<BitOrder>();
 
     let mut f: Ring = Ring::new(RingRepresentation::Degree255);
+    
+    for (i, chunk) in b.chunks(eta).enumerate() {
+        let mut x = 0u8;
+        let mut y = 0u8;
 
-    b.chunks(eta);
-
-    for i in 0..256 {
-        let mut x = 0;
-        let mut y = 0;
         for j in 0..eta {
-            x += b[2*eta*i + j];
-            y += b[2*eta*i + j + eta];
+            x += chunk[j] as u8;
+            y += chunk[j + eta] as u8;
         }
-        f.data[i] = (x - y) % params::Q;
+
+        f.data[i] = (x - y) as u16 % params::Q; //TODO maybe subtract under mod is wrong here
     }
 
     f
