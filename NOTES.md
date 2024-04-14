@@ -8,4 +8,6 @@ notes for later
 - Only functions tghat need to input / output bytes are the mlke.rs functions as requested by FIPS 203, inner functions can abstract and organize as needed.
 - We want entry-point functions to be easy to use, but we also want to maintain FIPS 203 compliance, so maybe add some sort of serialization / deserialize traits to these functions? (Note, sometimes encaps / decaps need the serialized versions, for example for hashing, need to find a clean way to verify inputs and then get hashed or unhashed versions)
 - Do a final check on public / private members, everything should be need to know basis.
-- Compression / Decompression implmenetations might not be right, also maybe they should be implemented onto the Ring
+- Fix Compress/Decompress
+- Fix Ring Multiplication
+- Try a branch without chaining and see if its better

@@ -6,7 +6,6 @@ use crate::serialize::BitOrder;
 use bitvec::prelude::*;
 
 pub fn sample_ntt(mut xof_stream: crypt::XOF) -> Ring {
-    let mut i = 0;
     let mut j = 0;
 
     let mut a: Ring = Ring::new(RingRepresentation::NTT);
@@ -27,8 +26,6 @@ pub fn sample_ntt(mut xof_stream: crypt::XOF) -> Ring {
             a.data[j] = d2;
             j += 1;
         }
-
-        i += 3;
     }
 
     a

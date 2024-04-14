@@ -47,32 +47,36 @@ pub fn key_gen<PARAMS: MlKemParams>() -> KpkeKeyGenOutput<{PARAMS::K}> where
     }
 
     // NTT both
-    s.ntt();
-    e.ntt();
+    let s = s.ntt();
+    let e = e.ntt();
 
-    let t = a.right_vector_multiply(&s).add(&e);
+    assert_eq!(s.data[0].t == RingRepresentation::NTT, true);
+    assert_eq!(e.data[0].t == RingRepresentation::NTT, true);
+
+    let mut t = a.right_vector_multiply(&s);
+    t.add(&e);
 
     ((t, rho), s)
 }
 
-pub type Cyphertext<const k: usize> = (Vector<{k}>, Ring);
+pub type Cyphertext<const k: usize, const d_u: usize, const d_v: usize> = (Compressed<{d_u}, Vector<{k}>>, Compressed<{d_v}, Ring>);
 
-
-pub fn encrypt<PARAMS: MlKemParams>(ek_pke: KpkeEncryptionKey<{PARAMS::K}>, mut m: Ring, rand: [u8; 32]) -> Cyphertext<{PARAMS::K}> where
+pub fn encrypt<PARAMS: MlKemParams>(ek_pke: KpkeEncryptionKey<{PARAMS::K}>, m: Compressed<1,Ring>, rand: [u8; 32]) -> Cyphertext<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}> where
     [(); PARAMS::K]: ,
     [(); 64 * PARAMS::ETA_1]: ,
     [(); 64 * PARAMS::ETA_2]: ,
     [(); 384 * PARAMS::K + 32]: ,
+    [(); {PARAMS::D_U}]: ,
 {
     let mut n = 0;
 
     let (t, rho) = ek_pke; // rho is the seed for A, the matrix, t comes from KeyGen's computation with their secret
 
     // Recreate the matrix A
-    let mut A: Matrix<{PARAMS::K}> = Matrix::new(RingRepresentation::NTT);
+    let mut a: Matrix<{PARAMS::K}> = Matrix::new(RingRepresentation::NTT);
     for i in 0..PARAMS::K {
         for j in 0..PARAMS::K {
-            A.data[i][j] = sample::sample_ntt(crypt::XOF::new(&rho, i as u8, j as u8));
+            a.data[i][j] = sample::sample_ntt(crypt::XOF::new(&rho, i as u8, j as u8));
         }
     }
 
@@ -99,33 +103,35 @@ pub fn encrypt<PARAMS: MlKemParams>(ek_pke: KpkeEncryptionKey<{PARAMS::K}>, mut 
         crypt::prf::<{PARAMS::ETA_2}>(&rand, n)
     );
 
-    r.ntt();
+    let r = r.ntt();
 
     // u is the encryptors computation with A and their secret, but this one is left-multiplied
-    let u = *(A.left_vector_multiply(&r))
-                            .inverse_ntt()
-                            .add(&e_1)
-                            .compress(PARAMS::D_U);
+    let mut u = a.left_vector_multiply(&r).inverse_ntt();
+    u.add(&e_1);
 
-    let mu = *m.decompress(1); // Our message is now a ring with elements 0 or q/2
+    let u_compressed = Compressed::<{PARAMS::D_U}, Vector<{PARAMS::K}>>::compress(u);
+
+    let m = m.decompress();
 
     // v is our shared secret, notice for both parties its approximately rAs.
-    let v = *(r.inner_product(&t))
-                    .inverse_ntt()
-                    .add(&e_2)
-                    .add(&mu)
-                    .compress(PARAMS::D_V);
+    let mut v_ntt = r.inner_product(t);
+    v_ntt.inverse_ntt().add(&e_2).add(&m);
 
-    (u, v)
+    let mut v = v_ntt;
+    let v_compressed = Compressed::<{PARAMS::D_V}, Ring>::compress(v);
+
+    (u_compressed, v_compressed)
 }
 
-pub fn decrypt<PARAMS: MlKemParams>(dk_kpe: Vector<{PARAMS::K}>, c: Cyphertext<{PARAMS::K}>) -> Ring {
-    let mut c = c;  
+pub fn decrypt<PARAMS: MlKemParams>(dk_kpe: Vector<{PARAMS::K}>, c: Cyphertext<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}>) -> Compressed<1, Ring> {
     //Decompress Cyphertext
-    let u = c.0.decompress(PARAMS::D_U); // rA + e from the encryptor
-    let v = c.1.decompress(PARAMS::D_V); // rt + e + m from the encryptor
+    let u_compressed = c.0; // rA + e from the encryptor
+    let v_compressed = c.1; // rt + e + m from the encryptor
 
-    let w = v.sub(&(dk_kpe.inner_product(&u.ntt())).inverse_ntt());
+    let u = u_compressed.decompress();
 
-    *w.compress(1)
+    let mut v = v_compressed.decompress();
+    v.sub(&dk_kpe.inner_product(u.ntt()).inverse_ntt());
+
+    Compressed::<1, Ring>::compress(v)
 }
