@@ -3,10 +3,10 @@ use crate::params::*;
 use crate::ring::*;
 use crate::sample;
 
-pub type KpkeEncryptionKey <const k: usize> = (Vector<{k}>, [u8; 32]);
-pub type KpkeDecryptionKey <const k: usize> = Vector<{k}>;
+pub type KpkeEncryptionKey <const K: usize> = (Vector<{K}>, [u8; 32]);
+pub type KpkeDecryptionKey <const K: usize> = Vector<{K}>;
 
-pub type KpkeKeyGenOutput <const k: usize> = (KpkeEncryptionKey<{k}>, KpkeDecryptionKey<{k}>);
+pub type KpkeKeyGenOutput <const K: usize> = (KpkeEncryptionKey<{K}>, KpkeDecryptionKey<{K}>);
 
 pub fn key_gen<PARAMS: MlKemParams>() -> KpkeKeyGenOutput<{PARAMS::K}> where
     [(); PARAMS::K]: ,
@@ -59,14 +59,14 @@ pub fn key_gen<PARAMS: MlKemParams>() -> KpkeKeyGenOutput<{PARAMS::K}> where
     ((t, rho), s)
 }
 
-pub type Cyphertext<const k: usize, const d_u: usize, const d_v: usize> = (Compressed<{d_u}, Vector<{k}>>, Compressed<{d_v}, Ring>);
+pub type Cyphertext<const K: usize, const D_U: usize, const D_V: usize> = (Compressed<{D_U}, Vector<{K}>>, Compressed<{D_V}, Ring>);
 
 pub fn encrypt<PARAMS: MlKemParams>(ek_pke: KpkeEncryptionKey<{PARAMS::K}>, m: Compressed<1,Ring>, rand: [u8; 32]) -> Cyphertext<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}> where
     [(); PARAMS::K]: ,
     [(); 64 * PARAMS::ETA_1]: ,
     [(); 64 * PARAMS::ETA_2]: ,
     [(); 384 * PARAMS::K + 32]: ,
-    [(); {PARAMS::D_U}]: ,
+    [(); PARAMS::D_U]: ,
 {
     let mut n = 0;
 
@@ -117,7 +117,7 @@ pub fn encrypt<PARAMS: MlKemParams>(ek_pke: KpkeEncryptionKey<{PARAMS::K}>, m: C
     let mut v_ntt = r.inner_product(t);
     v_ntt.inverse_ntt().add(&e_2).add(&m);
 
-    let mut v = v_ntt;
+    let v = v_ntt;
     let v_compressed = Compressed::<{PARAMS::D_V}, Ring>::compress(v);
 
     (u_compressed, v_compressed)

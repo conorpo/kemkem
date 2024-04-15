@@ -1,15 +1,30 @@
 use crate::{params, util::{self, bitrev7}};
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum RingRepresentation {
     Degree255,
     NTT
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Ring {
     pub data: [u16; 256],
     pub t: RingRepresentation
+}
+
+pub fn fastmodpow(base: u16, exp: u8) -> u16 {
+    let mut base = base as u32; // As mod is around 2^12, this garuntees no overflow
+    let mut exp = exp as u32; 
+    let mut result = 1;
+
+    while exp > 0 {
+        if exp % 2 == 1 {
+            result = (result * base) % params::Q as u32;
+        }
+        exp = exp >> 1;
+        base = (base * base) % params::Q as u32;
+    }
+    result as u16
 }
 
 
@@ -28,8 +43,10 @@ impl Ring {
     }
     
     pub fn scalar_mul(&mut self, value: u16) {
+        let val = value as u32;
+
         for i in 0..256 {
-            self.data[i] = (self.data[i] * value) % params::Q;
+            self.data[i] = ((self.data[i] as u32 * val) % params::Q as u32) as u16;
         }
     }
 
@@ -56,10 +73,13 @@ impl Ring {
         let b = &other.data;
 
         for i in 0usize..128usize {
-            let gamma = params::ZETA.pow(2*(bitrev7(i as u8) as u32) + 1);
+            let gamma = fastmodpow(params::ZETA, 2*bitrev7(i as u8) + 1) as u64;
 
-            a[2*i] = (a[2*i] * b[2*i] + gamma * a[2*i + 1] * b[2*i + 1]) % params::Q;
-            a[2*i + 1] = (a[2*i] * b[2*i + 1] + a[2*i + 1] * b[2*i]) % params::Q;
+            let r_1: u64 = (a[2*i] as u64) * (b[2*i] as u64) + gamma * (a[2*i + 1] as u64) * (b[2*i + 1] as u64); 
+            let r_2: u64 = (a[2*i] as u64) * (b[2*i + 1] as u64) + (a[2*i + 1] as u64) * (b[2*i] as u64);
+
+            a[2*i] = (r_1 % params::Q as u64) as u16;
+            a[2*i + 1] = (r_2 % params::Q as u64) as u16;
         }
 
         self
@@ -74,12 +94,12 @@ impl Ring {
             while len >= 2 {
                 let mut start = 0;
                 while start < 256 {
-                    let zeta = params::ZETA.pow(util::bitrev7(k) as u32) % params::Q;
+                    let zeta = fastmodpow(params::ZETA, util::bitrev7(k)) as u32;
 
                     k += 1;
 
                     for j in start..(start + len) {
-                        let t = (zeta * data[j + len]) % params::Q;
+                        let t = ((zeta * data[j + len] as u32)  % params::Q as u32) as u16;
                         data[j + len] = (data[j] + params::Q - t) % params::Q;
                         data[j] = (data[j] + t) % params::Q;
                     }
@@ -105,14 +125,14 @@ impl Ring {
             while len <= 128 {
                 let mut start = 0;
                 while start < 256 {
-                    let zeta = params::ZETA.pow(util::bitrev7(k) as u32) % params::Q;
+                    let zeta = fastmodpow(params::ZETA, util::bitrev7(k)) as u32;
 
                     k -= 1;
 
                     for j in start..(start + len) {
                         let t = data[j];
                         data[j] = (data[j+len] + t) % params::Q;
-                        data[j+len] = (zeta*(params::Q + t - data[j+len])) % params::Q;
+                        data[j+len] = ((zeta*(params::Q + t - data[j+len]) as u32) % params::Q as u32) as u16;
                     }
 
                     start += 2 * len;
@@ -144,28 +164,28 @@ impl PartialEq for Ring {
 }
 
 //Tuple that is either all ring or all ntt, k is length
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Vector<const k: usize> {
     pub data: [Ring; k]
 }
 
-impl<const k: usize> Vector<k> { 
-    pub fn new(t: RingRepresentation) -> Vector<k> {
+impl<const K: usize> Vector<K> { 
+    pub fn new(t: RingRepresentation) -> Vector<K> {
         Vector {
             data: core::array::from_fn(|_| Ring::new(t))
         }
     }
 
-    pub fn add(&mut self, other: &Vector<k>) -> &mut Self {
-        for i in 0..k {
+    pub fn add(&mut self, other: &Vector<K>) -> &mut Self {
+        for i in 0..K {
             self.data[i].add(&other.data[i]);
         }
         self
     }
 
-    pub fn inner_product(mut self, other: Vector<k>) -> Ring {
+    pub fn inner_product(mut self, other: Vector<K>) -> Ring {
         let mut result = Ring::new(self.data[0].t);
-        for i in 0..k {
+        for i in 0..K {
             result.add(
                 self.data[i].mult( &other.data[i] )
             );
@@ -175,14 +195,14 @@ impl<const k: usize> Vector<k> {
 
     // NTT and NTT^-1 are in place and chainable
     pub fn ntt(mut self) -> Self {
-        for i in 0..k {
+        for i in 0..K {
             self.data[i].ntt();
         }
         self
     }
 
     pub fn inverse_ntt(mut self) -> Self {
-        for i in 0..k {
+        for i in 0..K {
             self.data[i].inverse_ntt();
         }
         self
@@ -201,86 +221,80 @@ impl<const k: usize> PartialEq for Vector<k> {
 }
 
 // Represent a compressed ring or vector as its own type
-pub struct Compressed<const d: usize, T> 
-{
-    ring: T
-}
 
-impl<const d: usize> Compressed<d, Ring> {
-    pub fn compress(mut ring: Ring) -> Compressed<d, Ring> {
+#[derive(PartialEq, Clone, Debug)]
+pub struct Compressed<const D: usize, T> (pub T);
+impl<const D: usize> Compressed<D, Ring> {
+    pub fn compress(mut ring: Ring) -> Compressed<D, Ring> {
         for i in 0..256 {
-            ring.data[i] = ((ring.data[i] as u32) * 2u32.pow(d as u32) / params::Q as u32) as u16;
+            ring.data[i] = ((ring.data[i] as u32) * 2u32.pow(D as u32) / params::Q as u32) as u16;
         }
         
-        Compressed {
-            ring: ring
-        }
+        Compressed (ring)
     }
 
     pub fn decompress(self) -> Ring {
-        let Compressed { mut ring } = self;
+        let Compressed (mut ring) = self;
 
         for i in 0..256 {
-            ring.data[i] = ((ring.data[i] as u32) * params::Q as u32 / 2u32.pow(d as u32)) as u16;
+            ring.data[i] = ((ring.data[i] as u32) * params::Q as u32 / 2u32.pow(D as u32)) as u16;
         }
         
         ring
     }
 }
 
-impl<const d: usize, const k: usize> Compressed<d, Vector<k>> {
-    pub fn compress(mut vector: Vector<k>) -> Compressed<d, Vector<k>> {
-        for i in 0..k {
+impl<const D: usize, const K: usize> Compressed<D, Vector<K>> {
+    pub fn compress(mut vector: Vector<K>) -> Compressed<D, Vector<K>> {
+        for i in 0..K {
             for j in 0..256 {
-                vector.data[i].data[j] = ((vector.data[i].data[j] as u32) * 2u32.pow(d as u32) / params::Q as u32) as u16;
+                vector.data[i].data[j] = ((vector.data[i].data[j] as u32) * 2u32.pow(D as u32) / params::Q as u32) as u16;
             }
         }
         
-        Compressed {
-            ring: vector
-        }
+        Compressed (vector)
     }
 
-    pub fn decompress(self) -> Vector<k> {
-        let Compressed { mut ring } = self;
+    pub fn decompress(self) -> Vector<K> {
+        let Compressed (mut vector) = self;
 
-        for i in 0..k {
+        for i in 0..K {
             for j in 0..256 {
-                ring.data[i].data[j] = ((ring.data[i].data[j] as u32) * params::Q as u32 / 2u32.pow(d as u32)) as u16;
+                vector.data[i].data[j] = ((vector.data[i].data[j] as u32) * params::Q as u32 / 2u32.pow(D as u32)) as u16;
             }
         }
         
-        ring
+        vector
     }
 }
 
 
-pub struct Matrix<const k: usize> {
-    pub data: [[Ring; k]; k]
+pub struct Matrix<const K: usize> {
+    pub data: [[Ring; K]; K]
 }
 
-impl<const k: usize> Matrix<k> {
-    pub fn new(t: RingRepresentation) -> Matrix<k> {
+impl<const K: usize> Matrix<K> {
+    pub fn new(t: RingRepresentation) -> Matrix<K> {
         Matrix {
             data: core::array::from_fn(|_| core::array::from_fn(|_| Ring::new(t)))
         }
     }
 
     // These matrix operations are only ever done once, so they can be consuming on the matrix
-    pub fn right_vector_multiply(mut self, vector: &Vector<k>) -> Vector<k> {
+    pub fn right_vector_multiply(mut self, vector: &Vector<K>) -> Vector<K> {
         let mut result = Vector::new(self.data[0][0].t);
-        for i in 0..k {
-            for j in 0..k {
+        for i in 0..K {
+            for j in 0..K {
                 result.data[i].add(self.data[i][j].mult(&vector.data[j]));  
             }
         }
         result
     }
 
-    pub fn left_vector_multiply(mut self, vector: &Vector<k>) -> Vector<k> {
+    pub fn left_vector_multiply(mut self, vector: &Vector<K>) -> Vector<K> {
         let mut result = Vector::new(self.data[0][0].t);
-        for i in 0..k {
-            for j in 0..k {
+        for i in 0..K {
+            for j in 0..K {
                 result.data[i].add(self.data[j][i].mult(&vector.data[j]));
             }
         }

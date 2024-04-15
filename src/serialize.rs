@@ -6,6 +6,7 @@ use crate::crypt::*;
 use crate::kpke::*;
 use crate::params::*;
 use crate::ring::*;
+use crate::mlkem::*;
 use bitvec::prelude::*;
 use bitvec::access::*;
 
@@ -24,38 +25,42 @@ pub fn ByteDecode<const d: usize>(bitvec_slice: &BitSlice<u8, BitOrder>) -> Ring
     }
     F
 }
-pub trait MlKemSerialize<PARAMS: MlKemParams> {
+pub trait MlKemSerialize {
     fn serialize(&self) -> BitVec<u8, BitOrder>;
 }
 
 const DESERIALIZE_ERROR: &'static str = "Failed to deserialize";
-pub trait MlKemDeserialize<PARAMS: MlKemParams> {
+pub trait MlKemDeserialize {
     fn deserialize(bitvec: &BitVec<u8, BitOrder>) -> Self;
 }
 
-impl<PARAMS: MlKemParams> MlKemSerialize<PARAMS> for KpkeEncryptionKey<{PARAMS::K}> {
+
+impl<const K: usize> MlKemSerialize for MlkemEncapsulationKey<{K}> {
     fn serialize(&self) -> BitVec<u8, BitOrder> {
-        let mut bitvec = bitvec![u8, BitOrder; 0; PARAMS::K * 256 * 12 + 32];
-        for (i, chunk) in bitvec.chunks_mut(256 * 12).enumerate() {
+        let mut bitvec = bitvec![u8, BitOrder; 0; 8 * (384 * K + 32)];
+
+        let (t_slice, rho_slice) = bitvec.split_at_mut(384 * K * 8);
+
+        for (i, chunk) in t_slice.chunks_mut(384 * 8).enumerate() {
             ByteEncode::<12>(&self.0.data[i], chunk);
         }
 
         // Serialize rho into last 32 bytes
-        bitvec[256 * 12 * PARAMS::K..].chunks_mut(8).enumerate().for_each(|(i, chunk)| {
-            chunk.store_be(self.1[i]);
-        });
-
+        for (i, byte) in rho_slice.chunks_mut(8).enumerate() {
+            byte.store_be(self.1[i]);
+        }
+        
         bitvec
     }
 }
 
-impl<PARAMS: MlKemParams> MlKemDeserialize<PARAMS> for KpkeEncryptionKey<{PARAMS::K}> {
+impl<const k: usize> MlKemDeserialize for MlkemEncapsulationKey<{k}> {
     fn deserialize(bitvec: &BitVec<u8, BitOrder>) -> Self {
-        let (t_slice, rho_slice) = bitvec.split_at(256 * 12 * PARAMS::K);
+        let (t_slice, rho_slice) = bitvec.split_at(256 * 12 * k);
 
         let mut t = Vector::new(RingRepresentation::Degree255);
-        for (k, ring) in t_slice.chunks(256 * 12).enumerate() {
-            t.data[k] = ByteDecode::<12>(ring);
+        for (i, ring) in t_slice.chunks(256 * 12).enumerate() {
+            t.data[i] = ByteDecode::<12>(ring);
         }
 
         let mut rho = [0u8; 32];
@@ -67,33 +72,86 @@ impl<PARAMS: MlKemParams> MlKemDeserialize<PARAMS> for KpkeEncryptionKey<{PARAMS
     }
 }
 
-impl<PARAMS: MlKemParams> MlKemSerialize<PARAMS> for Cyphertext<{PARAMS::K}> where 
-    [(); 32*(PARAMS::D_U * PARAMS::K + PARAMS::D_V)]:
-{
+impl<const k: usize> MlKemSerialize for MlkemDecapsulationKey<{k}> {
     fn serialize(&self) -> BitVec<u8, BitOrder> {
-        let mut bitvec = bitvec![u8, BitOrder; 0; 32*(PARAMS::D_U * PARAMS::K + PARAMS::D_V)];
-        
-        for (k, ring) in bitvec.chunks_mut(PARAMS::D_U * 256).enumerate() {
-            ByteEncode::<{PARAMS::D_U}>(&self.0.data[k], ring);
+        let mut bitvec = bitvec![u8, BitOrder; 0; 768 * k + 96];
+
+        // Serialize dk_pke
+        for (i, chunk ) in bitvec[..384 * k].chunks_mut(384).enumerate() {
+            ByteEncode::<12>(&self.0.data[i], chunk);
         }
 
-        for (_, ring) in bitvec.chunks_mut(PARAMS::D_V * 256).enumerate() {
-            ByteEncode::<{PARAMS::D_V}>(&self.1, ring);
-        }
+        // Use our ek serialize implementation to get the serialized ek
+        let serialized_ek = self.1.serialize();
+        bitvec[384 * k..768 * k + 32].copy_from_bitslice(&serialized_ek);
+
+        // Serialize hash
+        bitvec[768 * k + 32..].copy_from_bitslice(&self.2.view_bits());
+
+        // Serialize implicit rejection randomness
+        bitvec[768 * k + 64..].copy_from_bitslice(&self.3.view_bits());
+
 
         bitvec
     }
 }
 
-// Serialize is only every used on Message Ring, bad practice but this defines serializaiton of that specific ring
-impl<PARAMS: MlKemParams> MlKemSerialize<PARAMS> for Ring {
-    fn serialize(&self) -> BitVec<u8, BitOrder> {
-        let mut bitvec = bitvec![u8, BitOrder; 32];
+impl<const k: usize> MlKemDeserialize for MlkemDecapsulationKey<{k}> {
+    fn deserialize(bitvec: &BitVec<u8, BitOrder>) -> Self {
+        let (dk_pke_slice, rest) = bitvec.split_at(384 * k);
+        let (ek_slice, rest) = rest.split_at(384 * k + 32);
+        let (hash_slice, z_slice) = rest.split_at(32);
 
-        ByteEncode::<1>(self, bitvec.chunks_mut(256).next().unwrap());
+        let mut dk_pke = Vector::new(RingRepresentation::NTT);
+        for (i, chunk) in dk_pke_slice.chunks(12).enumerate() {
+            dk_pke.data[i] = ByteDecode::<12>(chunk);
+        }
+
+        let ek = MlkemEncapsulationKey::<{k}>::deserialize(&BitVec::from_bitslice(ek_slice));
+
+        let mut hash = [0u8; 32];
+        for (i, byte) in hash_slice.chunks(8).enumerate() {
+            hash[i] = byte.load_be();
+        }
+
+        let mut z = [0u8; 32];
+        for (i, byte) in z_slice.chunks(8).enumerate() {
+            z[i] = byte.load_be();
+        }
+
+        (dk_pke, ek, hash, z)        
+    }
+}
+
+impl<const k: usize, const d_u: usize, const d_v: usize> MlKemSerialize for Cyphertext<{k}, {d_u}, {d_v}> where
+    [(); 32*(d_u * k + d_v)]:
+{
+    fn serialize(&self) -> BitVec<u8, BitOrder> {
+        let mut bitvec = bitvec![u8, BitOrder; 0; 32*(d_u * k + d_v)];
+
+        let (c1_slice, c2_slice) = bitvec.split_at_mut(d_u * 32 * k);
+        
+        for (i, chunk) in c1_slice.chunks_mut(256 * d_u).enumerate() {
+            ByteEncode::<{d_u}>(&self.0.0.data[i], chunk);
+        }
+
+        ByteEncode::<{d_v}>(&self.1.0, c2_slice);
 
         bitvec
     }
+}
 
-    
+impl MlKemSerialize for Compressed<1, Ring> {
+    fn serialize(&self) -> BitVec<u8, BitOrder> {
+        let mut bitvec = bitvec![u8, BitOrder; 0; 256];
+        ByteEncode::<1>(&self.0, bitvec.chunks_mut(256).next().unwrap());
+        bitvec
+    }
+}
+
+impl MlKemDeserialize for Compressed<1, Ring> {
+    fn deserialize(bitvec: &BitVec<u8, BitOrder>) -> Self {
+        let ring = ByteDecode::<1>(&bitvec);
+        Compressed(ring)
+    }
 }

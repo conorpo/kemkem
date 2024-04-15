@@ -11,3 +11,4 @@ notes for later
 - Fix Compress/Decompress
 - Fix Ring Multiplication
 - Try a branch without chaining and see if its better
+- Intermediate operations in scalar_mult, mult, ntt, ntt^-1 can overflow, sometimes even requires u64. Should consider using a higher bit size for Ring struct, if its worth it.
