@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 bitvec = "1.0.1"
+hex = "0.4.3"
 rand = "0.8.5"
 sha3 = "0.10.8"

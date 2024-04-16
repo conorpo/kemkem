@@ -3,7 +3,10 @@
 */
 
 pub const N : usize = 256;
+
 pub const Q : u16 = 3329;
+pub const Q32: u32 = 3329;
+
 pub const ZETA: u16 = 17;
 
 pub trait MlKemParams {

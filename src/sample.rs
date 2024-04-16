@@ -35,20 +35,19 @@ pub fn sample_ntt(mut xof_stream: crypt::XOF) -> Ring {
 pub fn sample_poly_cbd<const ETA: usize>(byte_array: [u8; 64*ETA]) -> Ring 
     where [u8; 64*ETA]:
 {
-    let b = byte_array.view_bits::<BitOrder>();
-
+    let b = byte_array.view_bits::<Lsb0>();
     let mut f: Ring = Ring::new(RingRepresentation::Degree255);
     
     for (i, chunk) in b.chunks(2 * ETA).enumerate() {
-        let mut x = 0i16;
-        let mut y = 0i16;
+        let mut x = 0u16;
+        let mut y = 0u16;
 
         for j in 0..ETA {
-            x += chunk[j] as i16;
-            y += chunk[j + ETA] as i16;
+            x += chunk[j] as u16;
+            y += chunk[j + ETA] as u16;
         }
 
-        f.data[i] = (x - y + params::Q as i16) as u16 % params::Q; //TODO maybe subtract under mod is wrong here
+        f.data[i] = (x + params::Q - y) % params::Q;
     }
 
     f

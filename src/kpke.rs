@@ -1,20 +1,52 @@
+use std::fmt::UpperHex;
+
 use crate::crypt;
 use crate::params::*;
 use crate::ring::*;
 use crate::sample;
+
+#[cfg(debug_assertions)]
+use crate::debug_values::DebugValues;
 
 pub type KpkeEncryptionKey <const K: usize> = (Vector<{K}>, [u8; 32]);
 pub type KpkeDecryptionKey <const K: usize> = Vector<{K}>;
 
 pub type KpkeKeyGenOutput <const K: usize> = (KpkeEncryptionKey<{K}>, KpkeDecryptionKey<{K}>);
 
-pub fn key_gen<PARAMS: MlKemParams>() -> KpkeKeyGenOutput<{PARAMS::K}> where
+
+pub fn key_gen<PARAMS: MlKemParams + DebugValues<PARAMS>>() -> KpkeKeyGenOutput<{PARAMS::K}> where
+    [(); 384 * PARAMS::K + 32]: ,
+    [(); 768 * PARAMS::K + 96]: ,
     [(); PARAMS::K]: ,
     [(); PARAMS::ETA_2]: ,
     [(); 64 * PARAMS::ETA_1]: ,
+    [(); 32 * (PARAMS::D_U * PARAMS::K + PARAMS::D_V)]: ,
 {
-    let d = crypt::random_bytes::<32>();
+    let d = match cfg!(debug_assertions) {
+        true => PARAMS::KEYGEN_DEBUG.d,
+        false => crypt::random_bytes::<32>()
+    };
+
+    debug!("d: {}", {
+        d.iter()
+         .map(|byte| format!("{:02X}", byte))
+         .collect::<String>()
+    });
+
     let (rho, sigma) = crypt::G::<32>(&d);
+
+    debug!("\nrho: {}\nsigma: {}", {
+        rho.iter()
+         .map(|byte| format!("{:02X}", byte))
+         .collect::<String>()
+    }, {
+        sigma.iter()
+         .map(|byte| format!("{:02X}", byte))
+         .collect::<String>()
+    });
+
+    debug_assert_eq!(rho, PARAMS::KEYGEN_DEBUG.rho);
+    debug_assert_eq!(sigma, PARAMS::KEYGEN_DEBUG.sigma);
 
     let mut n = 0;
 
@@ -23,9 +55,11 @@ pub fn key_gen<PARAMS: MlKemParams>() -> KpkeKeyGenOutput<{PARAMS::K}> where
 
     for i in 0..PARAMS::K {
         for j in 0..PARAMS::K {
-            a.data[i][j] = sample::sample_ntt(crypt::XOF::new(&rho, i as u8, j as u8)) // XOF stream is instantied here for each index of the matrix
+            a.data[i][j] = sample::sample_ntt(crypt::XOF::new(&rho, j as u8, i as u8)) // XOF stream is instantied here for each index of the matrix
         }
     }
+
+    debug!("\naHat: {:?}", a);
 
     // Our secret key
     let mut s = Vector::new(RingRepresentation::Degree255); //This is ugly, maybe use an iterator to make the polynomials, then collect them into a vector
@@ -36,7 +70,7 @@ pub fn key_gen<PARAMS: MlKemParams>() -> KpkeKeyGenOutput<{PARAMS::K}> where
         n += 1;
     }
 
-
+    
     // Our error vector
     let mut e = Vector::new(RingRepresentation::Degree255);
     for i in 0..PARAMS::K {
@@ -46,15 +80,24 @@ pub fn key_gen<PARAMS: MlKemParams>() -> KpkeKeyGenOutput<{PARAMS::K}> where
         n += 1;
     }
 
+    debug!("\ns: {:?}", s);
+    debug!("\ne: {:?}", e);
+    
+    
     // NTT both
     let s = s.ntt();
     let e = e.ntt();
 
-    assert_eq!(s.data[0].t == RingRepresentation::NTT, true);
-    assert_eq!(e.data[0].t == RingRepresentation::NTT, true);
+    debug!("\nsHat: {:?}", s);
+    debug!("eHat: {:?}", e);
 
     let mut t = a.right_vector_multiply(&s);
+
+    debug!("aHat * sHat: {:?}", t);
+
     t.add(&e);
+
+    debug!("tHat = aHat * sHat + eHat: {:?}", t);
 
     ((t, rho), s)
 }
@@ -108,7 +151,6 @@ pub fn encrypt<PARAMS: MlKemParams>(ek_pke: KpkeEncryptionKey<{PARAMS::K}>, m: C
     // u is the encryptors computation with A and their secret, but this one is left-multiplied
     let mut u = a.left_vector_multiply(&r).inverse_ntt();
     u.add(&e_1);
-
     let u_compressed = Compressed::<{PARAMS::D_U}, Vector<{PARAMS::K}>>::compress(u);
 
     let m = m.decompress();
@@ -117,8 +159,7 @@ pub fn encrypt<PARAMS: MlKemParams>(ek_pke: KpkeEncryptionKey<{PARAMS::K}>, m: C
     let mut v_ntt = r.inner_product(t);
     v_ntt.inverse_ntt().add(&e_2).add(&m);
 
-    let v = v_ntt;
-    let v_compressed = Compressed::<{PARAMS::D_V}, Ring>::compress(v);
+    let v_compressed = Compressed::<{PARAMS::D_V}, Ring>::compress(v_ntt);
 
     (u_compressed, v_compressed)
 }

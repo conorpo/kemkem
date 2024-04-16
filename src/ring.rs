@@ -1,4 +1,5 @@
-use crate::{params, util::{self, bitrev7}};
+use crate::params;
+use crate::util::*;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum RingRepresentation {
@@ -12,19 +13,16 @@ pub struct Ring {
     pub t: RingRepresentation
 }
 
-pub fn fastmodpow(base: u16, exp: u8) -> u16 {
-    let mut base = base as u32; // As mod is around 2^12, this garuntees no overflow
-    let mut exp = exp as u32; 
-    let mut result = 1;
 
-    while exp > 0 {
-        if exp % 2 == 1 {
-            result = (result * base) % params::Q as u32;
+impl ToString for Ring {
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        for i in 0..256 {
+            s.push_str(format!("{:X}", self.data[i]).as_str());
+            s.push(',');
         }
-        exp = exp >> 1;
-        base = (base * base) % params::Q as u32;
+        s
     }
-    result as u16
 }
 
 
@@ -36,12 +34,6 @@ impl Ring {
         }
     }
 
-    pub fn scalar_add(&mut self, value: u16) {
-        for i in 0..256 {
-            self.data[i] = (self.data[i] + value) % params::Q;
-        }
-    }
-    
     pub fn scalar_mul(&mut self, value: u16) {
         let val = value as u32;
 
@@ -87,6 +79,8 @@ impl Ring {
 
     // In-Place, transforms ring to NTT form
     pub fn ntt(&mut self) -> &mut Self {
+        const Q32: u32 = params::Q as u32;
+
         if let Ring { data, t: RingRepresentation::Degree255 } = self {
             let mut k = 1;
             let mut len = 128;
@@ -94,14 +88,14 @@ impl Ring {
             while len >= 2 {
                 let mut start = 0;
                 while start < 256 {
-                    let zeta = fastmodpow(params::ZETA, util::bitrev7(k)) as u32;
+                    let zeta = fastmodpow(params::ZETA, bitrev7(k)) as u32;
 
                     k += 1;
 
                     for j in start..(start + len) {
-                        let t = ((zeta * data[j + len] as u32)  % params::Q as u32) as u16;
-                        data[j + len] = (data[j] + params::Q - t) % params::Q;
-                        data[j] = (data[j] + t) % params::Q;
+                        let t = (zeta * data[j + len] as u32) % Q32;
+                        data[j + len] = ((data[j] as u32 + Q32 - t) % Q32) as u16;
+                        data[j] = ((data[j] as u32 + t) % Q32) as u16;
                     }
 
                     start += 2 * len;
@@ -119,20 +113,22 @@ impl Ring {
     }
 
     pub fn inverse_ntt(&mut self) -> &mut Self {
+        const Q32: u32 = params::Q as u32;
+
         if let Ring {  data, t: RingRepresentation::NTT } = self {
             let mut k = 127;
             let mut len = 2;
             while len <= 128 {
                 let mut start = 0;
                 while start < 256 {
-                    let zeta = fastmodpow(params::ZETA, util::bitrev7(k)) as u32;
+                    let zeta = fastmodpow(params::ZETA, bitrev7(k)) as u32;
 
                     k -= 1;
 
                     for j in start..(start + len) {
                         let t = data[j];
                         data[j] = (data[j+len] + t) % params::Q;
-                        data[j+len] = ((zeta*(params::Q + t - data[j+len]) as u32) % params::Q as u32) as u16;
+                        data[j+len] = ((zeta * (params::Q + t - data[j+len]) as u32) % params::Q as u32) as u16;
                     }
 
                     start += 2 * len;
@@ -165,8 +161,8 @@ impl PartialEq for Ring {
 
 //Tuple that is either all ring or all ntt, k is length
 #[derive(Clone, Debug)]
-pub struct Vector<const k: usize> {
-    pub data: [Ring; k]
+pub struct Vector<const K: usize> {
+    pub data: [Ring; K]
 }
 
 impl<const K: usize> Vector<K> { 
@@ -209,9 +205,9 @@ impl<const K: usize> Vector<K> {
     }
 }
 
-impl<const k: usize> PartialEq for Vector<k> {
+impl<const K: usize> PartialEq for Vector<K> {
     fn eq(&self, other: &Self) -> bool {
-        for i in 0..k {
+        for i in 0..K {
             if self.data[i] != other.data[i] {
                 return false;
             }
@@ -224,10 +220,23 @@ impl<const k: usize> PartialEq for Vector<k> {
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Compressed<const D: usize, T> (pub T);
+
+pub trait CompressionConstants<const D: usize> {
+    const POW_HALF: u32;
+    const BITMASK: u16;
+}
+
+impl<const D: usize, T> CompressionConstants<D> for Compressed<D, T> {
+    const POW_HALF: u32 = 1 << (D - 1);
+    const BITMASK: u16 = (1 << D) - 1;
+}
+
+const Q_HALF: u32 = params::Q32 / 2;
+
 impl<const D: usize> Compressed<D, Ring> {
     pub fn compress(mut ring: Ring) -> Compressed<D, Ring> {
         for i in 0..256 {
-            ring.data[i] = ((ring.data[i] as u32) * 2u32.pow(D as u32) / params::Q as u32) as u16;
+            ring.data[i] = ((((ring.data[i] as u32) << D) + Q_HALF) / params::Q32) as u16 & Compressed::<D, Ring>::BITMASK;
         }
         
         Compressed (ring)
@@ -237,7 +246,7 @@ impl<const D: usize> Compressed<D, Ring> {
         let Compressed (mut ring) = self;
 
         for i in 0..256 {
-            ring.data[i] = ((ring.data[i] as u32) * params::Q as u32 / 2u32.pow(D as u32)) as u16;
+            ring.data[i] = (((ring.data[i] as u32) * params::Q32 + Compressed::<D, Ring>::POW_HALF) >> D) as u16;
         }
         
         ring
@@ -248,7 +257,8 @@ impl<const D: usize, const K: usize> Compressed<D, Vector<K>> {
     pub fn compress(mut vector: Vector<K>) -> Compressed<D, Vector<K>> {
         for i in 0..K {
             for j in 0..256 {
-                vector.data[i].data[j] = ((vector.data[i].data[j] as u32) * 2u32.pow(D as u32) / params::Q as u32) as u16;
+                vector.data[i].data[j] = ((((vector.data[i].data[j] as u32) << D) + Q_HALF) / params::Q32) 
+                    as u16 & Compressed::<D, Vector<K>>::BITMASK;
             }
         }
         
@@ -260,7 +270,7 @@ impl<const D: usize, const K: usize> Compressed<D, Vector<K>> {
 
         for i in 0..K {
             for j in 0..256 {
-                vector.data[i].data[j] = ((vector.data[i].data[j] as u32) * params::Q as u32 / 2u32.pow(D as u32)) as u16;
+                vector.data[i].data[j] = (((vector.data[i].data[j] as u32) * params::Q32 + Compressed::<D, Vector<K>>::POW_HALF) >> D) as u16;
             }
         }
         
@@ -269,6 +279,7 @@ impl<const D: usize, const K: usize> Compressed<D, Vector<K>> {
 }
 
 
+#[derive(Clone, Debug)]
 pub struct Matrix<const K: usize> {
     pub data: [[Ring; K]; K]
 }
