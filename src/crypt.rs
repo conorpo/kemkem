@@ -18,9 +18,9 @@ pub fn G<const L: usize>(c: &[u8; L]) -> ([u8; 32], [u8; 32]) {
     (a.try_into().unwrap(), b.try_into().unwrap())
 }
 
-pub fn H(s: Vec<u8>) -> [u8; 32] {
+pub fn H(s: &Vec<u8>) -> [u8; 32] {
     let mut hasher = Sha3_256::new();
-    Digest::update(&mut hasher, &s);
+    Digest::update(&mut hasher, s);
     let output = hasher.finalize();
 
     output.try_into().unwrap()

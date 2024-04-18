@@ -1,8 +1,6 @@
 use crate::ring::*;
 use crate::params;
 use crate::crypt;
-use crate::serialize::BitOrder;
-
 
 use bitvec::prelude::*;
 

@@ -25,12 +25,6 @@ pub fn fastmodpow(base: u16, exp: u8) -> u16 {
     result as u16
 }
 
-#[macro_export]
-macro_rules! debug {
-    ($($arg:tt)*) => (#[cfg(debug_assertions)] println!($($arg)*));
-}
-
-
 #[cfg(test)]
 mod tests {
     use super::*;

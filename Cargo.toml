@@ -2,11 +2,24 @@
 name = "kemkem"
 version = "0.1.0"
 edition = "2021"
+description = "Unverified, unoptimized, and downright dirty implementation of the ML-KEM"
+license = "MIT"
+repository = "https://github.com/conorpo/kemkem"
+readme = "README.md"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 bitvec = "1.0.1"
-hex = "0.4.3"
 rand = "0.8.5"
 sha3 = "0.10.8"
+
+[lib]
+crate-type=["lib"]
+
+[[bin]]
+name = "benchmark"
+
+[[bin]]
+name = "ebats_benchmark"

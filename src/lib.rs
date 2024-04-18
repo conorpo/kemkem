@@ -20,7 +20,6 @@ mod serialize;
 
 mod kpke;
 
-#[cfg(debug_assertions)]
-mod debug_values; 
+mod seeded_test;
 
 pub mod mlkem;
