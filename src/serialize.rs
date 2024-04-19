@@ -8,10 +8,10 @@ use bitvec::access::*;
 
 pub type BitOrder = Lsb0;
 
-pub fn byte_encode<const D: usize>(F: &Ring, bitvec_slice: &mut BitSlice<BitSafeU8, BitOrder>) {
+pub fn byte_encode<const D: usize>(f: &Ring, bitvec_slice: &mut BitSlice<BitSafeU8, BitOrder>) {
     assert_eq!(bitvec_slice.len(), 256 * D);
 
-    for (slot, ele) in bitvec_slice.chunks_mut(D).zip(F.data.iter()) {
+    for (slot, ele) in bitvec_slice.chunks_mut(D).zip(f.data.iter()) {
         slot.store_le(*ele)
     }
 }
@@ -30,7 +30,6 @@ pub trait MlKemSerialize {
     fn serialize(&self) -> BitVec<u8, BitOrder>;
 }
 
-const DESERIALIZE_ERROR: &'static str = "Failed to deserialize";
 pub trait MlKemDeserialize {
     fn deserialize(bitvec: &BitVec<u8, BitOrder>) -> Self;
 }
@@ -55,9 +54,9 @@ impl<const K: usize> MlKemSerialize for MlkemEncapsulationKey<{K}> {
     }
 }
 
-impl<const k: usize> MlKemDeserialize for MlkemEncapsulationKey<{k}> {
+impl<const K: usize> MlKemDeserialize for MlkemEncapsulationKey<{K}> {
     fn deserialize(bitvec: &BitVec<u8, BitOrder>) -> Self {
-        let (t_slice, rho_slice) = bitvec.split_at(256 * 12 * k);
+        let (t_slice, rho_slice) = bitvec.split_at(256 * 12 * K);
 
         let mut t = Vector::new(RingRepresentation::NTT);
         for (i, ring) in t_slice.chunks(256 * 12).enumerate() {
@@ -105,18 +104,18 @@ impl<const K: usize> MlKemSerialize for MlkemDecapsulationKey<{K}> {
     }
 }
 
-impl<const k: usize> MlKemDeserialize for MlkemDecapsulationKey<{k}> {
+impl<const K: usize> MlKemDeserialize for MlkemDecapsulationKey<{K}> {
     fn deserialize(bitvec: &BitVec<u8, BitOrder>) -> Self {
-        let (dk_pke_slice, rest) = bitvec.split_at(384 * k);
-        let (ek_slice, rest) = rest.split_at(384 * k + 32);
-        let (hash_slice, z_slice) = rest.split_at(32);
+        let (dk_pke_slice, rest) = bitvec.split_at(8*(384 * K));
+        let (ek_slice, rest) = rest.split_at(8*(384 * K + 32));
+        let (hash_slice, z_slice) = rest.split_at(8*(32));
 
         let mut dk_pke = Vector::new(RingRepresentation::NTT);
-        for (i, chunk) in dk_pke_slice.chunks(12).enumerate() {
+        for (i, chunk) in dk_pke_slice.chunks(8*384).enumerate() {
             dk_pke.data[i] = byte_decode::<12>(chunk, RingRepresentation::NTT);
         }
 
-        let ek = MlkemEncapsulationKey::<{k}>::deserialize(&BitVec::from_bitslice(ek_slice));
+        let ek = MlkemEncapsulationKey::<{K}>::deserialize(&BitVec::from_bitslice(ek_slice));
 
         let mut hash = [0u8; 32];
         for (i, byte) in hash_slice.chunks(8).enumerate() {

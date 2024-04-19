@@ -113,8 +113,6 @@ impl Ring {
     }
 
     pub fn inverse_ntt(&mut self) -> &mut Self {
-        const Q32: u32 = params::Q as u32;
-
         if let Ring {  data, t: RingRepresentation::NTT } = self {
             let mut k = 127;
             let mut len = 2;
@@ -127,8 +125,8 @@ impl Ring {
 
                     for j in start..(start + len) {
                         let t = data[j];
-                        data[j] = (data[j+len] + t) % params::Q;
-                        data[j+len] = ((zeta * (params::Q + t - data[j+len]) as u32) % params::Q as u32) as u16;
+                        data[j] = (data[j + len] + t) % params::Q;
+                        data[j + len] = ((zeta * (params::Q + data[j+len] - t) as u32) % params::Q32) as u16;
                     }
 
                     start += 2 * len;

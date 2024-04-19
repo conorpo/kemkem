@@ -1,4 +1,4 @@
-use crate::params::{Q, ZETA};
+use crate::params::Q32;
 
 pub fn bitrev7(x: u8) -> u8 {
     let mut x = x;
@@ -17,10 +17,10 @@ pub fn fastmodpow(base: u16, exp: u8) -> u16 {
 
     while exp > 0 {
         if exp % 2 == 1 {
-            result = (result * base) % Q as u32;
+            result = (result * base) % Q32;
         }
         exp = exp >> 1;
-        base = (base * base) % Q as u32;
+        base = (base * base) % Q32;
     }
     result as u16
 }
@@ -28,6 +28,7 @@ pub fn fastmodpow(base: u16, exp: u8) -> u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::params::ZETA;
 
     #[test]
     fn test_bitrev7() {

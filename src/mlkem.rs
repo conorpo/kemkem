@@ -12,8 +12,8 @@ use crate::crypt;
 use crate::ring::*;
 use crate::serialize::*;
 
-pub type MlkemEncapsulationKey<const k: usize> = KpkeEncryptionKey<k>;
-pub type MlkemDecapsulationKey<const k: usize> = (KpkeDecryptionKey<k>, KpkeEncryptionKey<k>, [u8; 32], [u8; 32]);
+pub type MlkemEncapsulationKey<const K: usize> = KpkeEncryptionKey<K>;
+pub type MlkemDecapsulationKey<const K: usize> = (KpkeDecryptionKey<K>, KpkeEncryptionKey<K>, [u8; 32], [u8; 32]);
 
 // ML-KEM.KeyGen
 pub fn key_gen<PARAMS: MlKemParams> () -> (MlkemEncapsulationKey<{PARAMS::K}>, MlkemDecapsulationKey<{PARAMS::K}>) where
@@ -32,7 +32,7 @@ pub fn key_gen<PARAMS: MlKemParams> () -> (MlkemEncapsulationKey<{PARAMS::K}>, M
     // Encapsulation key is the encryption key
     let encapsulation_key: MlkemEncapsulationKey<{PARAMS::K}> = ek;
 
-    let hash = crypt::H(&encapsulation_key.serialize().into_vec());
+    let hash = crypt::h(&encapsulation_key.serialize().into_vec());
 
     // Fujisaki-Okamoto transformation, turn decryption key into decapsulation
     let decapsulation_key: MlkemDecapsulationKey<{PARAMS::K}> = (dk, encapsulation_key.clone(), hash, z);
@@ -52,14 +52,14 @@ pub fn encaps<PARAMS: MlKemParams>(ek_mlkem: MlkemEncapsulationKey<{PARAMS::K}>)
 {
     let m = crypt::random_bytes::<32>();
 
-    let ek_hash = crypt::H(&ek_mlkem.serialize().into_vec());
+    let ek_hash = crypt::h(&ek_mlkem.serialize().into_vec());
 
     let mut combined = [0u8; 64];
 
     combined[..32].copy_from_slice(&m);
     combined[32..].copy_from_slice(&ek_hash);
 
-    let (key, r) = crypt::G::<64>(&combined);
+    let (key, r) = crypt::g::<64>(&combined);
     
     let m: Compressed<1, Ring> = Compressed::<1, Ring>::deserialize(&m.view_bits::<BitOrder>().to_bitvec());
 
@@ -87,9 +87,9 @@ pub fn decaps<PARAMS: MlKemParams>(c: kpke::Cyphertext<{PARAMS::K}, {PARAMS::D_U
     combined[..32].copy_from_slice(m.serialize().as_raw_slice());
     combined[32..].copy_from_slice(&hash);
 
-    let (key, rand) = crypt::G::<64>(&combined);
+    let (key, rand) = crypt::g::<64>(&combined);
 
-    let key_reject = crypt::J([&z, c.serialize().as_raw_slice()].concat());
+    let key_reject = crypt::j([&z, c.serialize().as_raw_slice()].concat());
 
     let c_prime = kpke::encrypt::<PARAMS>(ek, m, rand); // Should be same as encaps
 
@@ -100,17 +100,36 @@ pub fn decaps<PARAMS: MlKemParams>(c: kpke::Cyphertext<{PARAMS::K}, {PARAMS::D_U
 }
 
 
-#[cfg(test)]
 mod tests {
     use super::*;
     use crate::params::*;
 
     #[test]
-    fn test_keygen() {
-        let (ek, dk) = key_gen::<MlKem1024>();
-    }
+    fn test_mlkem<>(){
+        type PARAMS = MlKem512;
 
-    fn test_encaps() {
+        //ML-KEM.KeyGen
+        let (ek, dk) = key_gen::<PARAMS>();
 
+        let ek = ek.serialize();
+        let dk = dk.serialize();
+
+
+        
+        //ML-KEM.Encaps
+        let ek = MlkemEncapsulationKey::<{PARAMS::K}>::deserialize(&ek);
+        
+        let (key, c) = encaps::<PARAMS>(ek);
+
+        let c = c.serialize();
+
+
+        //ML-KEM.Decaps
+        let dk = MlkemDecapsulationKey::<{PARAMS::K}>::deserialize(&dk);
+        let c = kpke::Cyphertext::<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}>::deserialize(&c);
+
+        let key_prime = decaps::<PARAMS>(c, dk);
+
+        assert_eq!(key, key_prime);
     }
 }

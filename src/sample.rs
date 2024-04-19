@@ -36,16 +36,18 @@ pub fn sample_poly_cbd<const ETA: usize>(byte_array: [u8; 64*ETA]) -> Ring
     let b = byte_array.view_bits::<Lsb0>();
     let mut f: Ring = Ring::new(RingRepresentation::Degree255);
     
-    for (i, chunk) in b.chunks(2 * ETA).enumerate() {
+    let mut i = 0;
+    while i < 256 {
         let mut x = 0u16;
         let mut y = 0u16;
 
         for j in 0..ETA {
-            x += chunk[j] as u16;
-            y += chunk[j + ETA] as u16;
+            x += b[i*2*ETA + j] as u16;
+            y += b[i*2*ETA + j + ETA] as u16;
         }
 
         f.data[i] = (x + params::Q - y) % params::Q;
+        i += 1;
     }
 
     f

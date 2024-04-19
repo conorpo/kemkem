@@ -19,7 +19,7 @@ pub fn key_gen<PARAMS: MlKemParams>() -> KpkeKeyGenOutput<{PARAMS::K}> where
     // This is the main source of randomness for Party A (he also would've generated a value to use a random implict rejection answer).
     let d = crypt::random_bytes::<32>();
 
-    let (rho, sigma) = crypt::G::<32>(&d);
+    let (rho, sigma) = crypt::g::<32>(&d);
 
     let mut n = 0;
 
