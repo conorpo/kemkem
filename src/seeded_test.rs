@@ -110,7 +110,7 @@ mod test {
             let mut n = 0;
 
             // Our public key, (the bad bases)
-            let mut a: Matrix<{PARAMS::K}> = Matrix::new(RingRepresentation::NTT);
+            let mut a: Matrix<{PARAMS::K}> = Matrix::new_ntt();
 
             for i in 0..PARAMS::K {
                 for j in 0..PARAMS::K {
@@ -121,7 +121,7 @@ mod test {
             println!("\naHat: {:?}", a);
 
             // Our secret key
-            let mut s = Vector::new(RingRepresentation::Degree255); //This is ugly, maybe use an iterator to make the polynomials, then collect them into a vector
+            let mut s = Vector::new_degree255();
             for i in 0..PARAMS::K {
                 s.data[i] = sample::sample_poly_cbd::<{PARAMS::ETA_1}>(
                     crypt::prf::<{PARAMS::ETA_1}>(&sigma, n)
@@ -131,7 +131,7 @@ mod test {
 
             
             // Our error vector
-            let mut e = Vector::new(RingRepresentation::Degree255);
+            let mut e = Vector::new_degree255();
             for i in 0..PARAMS::K {
                 e.data[i] = sample::sample_poly_cbd::<{PARAMS::ETA_1}>(
                     crypt::prf::<{PARAMS::ETA_1}>(&sigma, n)
@@ -238,7 +238,7 @@ mod test {
             println!("t: {:?}", &t);
         
             // Recreate the matrix A
-            let mut a: Matrix<{PARAMS::K}> = Matrix::new(RingRepresentation::NTT);
+            let mut a: Matrix<{PARAMS::K}> = Matrix::new_ntt();
             for i in 0..PARAMS::K {
                 for j in 0..PARAMS::K {
                     a.data[i][j] = sample::sample_ntt(crypt::XOF::new(&rho, j as u8, i as u8));
@@ -248,7 +248,7 @@ mod test {
             println!("\na: {:?}", &a);
         
             // Encrpytor's Secret (Equivalent of S in key_gen)
-            let mut r: Vector<{PARAMS::K}> = Vector::new(RingRepresentation::Degree255);
+            let mut r: Vector<{PARAMS::K}> = Vector::new_degree255();
             for i in 0..PARAMS::K {
                 r.data[i] = sample::sample_poly_cbd::<{PARAMS::ETA_1}>(
                     crypt::prf::<{PARAMS::ETA_1}>(&rand, n)
@@ -259,7 +259,7 @@ mod test {
             println!("\nr: {:?}", &r);
         
             // Error vector to be added to R^T * A
-            let mut e_1: Vector<{PARAMS::K}> = Vector::new(RingRepresentation::Degree255);
+            let mut e_1: Vector<{PARAMS::K}> = Vector::new_degree255();
             for i in 0..PARAMS::K {
                 e_1.data[i] = sample::sample_poly_cbd::<{PARAMS::ETA_2}>(
                     crypt::prf::<{PARAMS::ETA_2}>(&rand, n)
@@ -402,7 +402,7 @@ mod test {
             println!("t: {:?}", &t);
         
             // Recreate the matrix A
-            let mut a: Matrix<{PARAMS::K}> = Matrix::new(RingRepresentation::NTT);
+            let mut a: Matrix<{PARAMS::K}> = Matrix::new_ntt();
             for i in 0..PARAMS::K {
                 for j in 0..PARAMS::K {
                     a.data[i][j] = sample::sample_ntt(crypt::XOF::new(&rho, j as u8, i as u8));
@@ -412,7 +412,7 @@ mod test {
             println!("\na: {:?}", &a);
         
             // Encrpytor's Secret (Equivalent of S in key_gen)
-            let mut r: Vector<{PARAMS::K}> = Vector::new(RingRepresentation::Degree255);
+            let mut r: Vector<{PARAMS::K}> = Vector::new_degree255();
             for i in 0..PARAMS::K {
                 r.data[i] = sample::sample_poly_cbd::<{PARAMS::ETA_1}>(
                     crypt::prf::<{PARAMS::ETA_1}>(&rand, n)
@@ -423,7 +423,7 @@ mod test {
             println!("\nr: {:?}", &r);
         
             // Error vector to be added to R^T * A
-            let mut e_1: Vector<{PARAMS::K}> = Vector::new(RingRepresentation::Degree255);
+            let mut e_1: Vector<{PARAMS::K}> = Vector::new_degree255();
             for i in 0..PARAMS::K {
                 e_1.data[i] = sample::sample_poly_cbd::<{PARAMS::ETA_2}>(
                     crypt::prf::<{PARAMS::ETA_2}>(&rand, n)

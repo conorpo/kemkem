@@ -5,7 +5,6 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use kemkem::mlkem::*;
 use kemkem::params::*;
 use kemkem::serialize::*;
-use kemkem::Cyphertext;
 
 fn bench_mlkem<PARAMS: MlKemParams>(criterion: &mut Criterion) where
     [(); 768 * PARAMS::K + 96]: , 
@@ -44,7 +43,7 @@ fn bench_mlkem_with_serialization<PARAMS: MlKemParams>(criterion: &mut Criterion
         let dk = MlkemDecapsulationKey::<{PARAMS::K}>::deserialize(&dk);
         let (key, c) = encaps::<PARAMS>(ek);
         let c = c.serialize();
-        let c = Cyphertext::<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}>::deserialize(&c);
+        let c = MlKemCyphertext::<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}>::deserialize(&c);
         let key_prime = decaps::<PARAMS>(c, dk);
 
         assert_eq!(key, key_prime);

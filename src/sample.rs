@@ -7,7 +7,7 @@ use bitvec::prelude::*;
 pub fn sample_ntt(mut xof_stream: crypt::XOF) -> Ring {
     let mut j = 0;
 
-    let mut a: Ring = Ring::new(RingRepresentation::NTT);
+    let mut a: Ring = Ring::ZEROES_NTT;
 
     while j < 256 {
         //Each iteration samples 3 unfiormly random bytes total
@@ -34,7 +34,7 @@ pub fn sample_poly_cbd<const ETA: usize>(byte_array: [u8; 64*ETA]) -> Ring
     where [u8; 64*ETA]:
 {
     let b = byte_array.view_bits::<Lsb0>();
-    let mut f: Ring = Ring::new(RingRepresentation::Degree255);
+    let mut f: Ring = Ring::ZEROES_DEGREE255;
     
     let mut i = 0;
     while i < 256 {

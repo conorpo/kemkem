@@ -1,6 +1,5 @@
 
 // Handles Compression and Byte Serialization
-use crate::kpke::*;
 use crate::ring::*;
 use crate::mlkem::*;
 use bitvec::prelude::*;
@@ -17,7 +16,10 @@ pub fn byte_encode<const D: usize>(f: &Ring, bitvec_slice: &mut BitSlice<BitSafe
 }
 
 pub fn byte_decode<const D: usize>(bitvec_slice: &BitSlice<u8, BitOrder>, t: RingRepresentation) -> Ring {
-    let mut f = Ring::new(t);
+    let mut f = match t {
+        RingRepresentation::NTT => Ring::ZEROES_NTT,
+        RingRepresentation::Degree255 => Ring::ZEROES_DEGREE255
+    };
 
     assert_eq!(bitvec_slice.len(), 256 * D);
 
@@ -58,7 +60,7 @@ impl<const K: usize> MlKemDeserialize for MlkemEncapsulationKey<{K}> {
     fn deserialize(bitvec: &BitVec<u8, BitOrder>) -> Self {
         let (t_slice, rho_slice) = bitvec.split_at(256 * 12 * K);
 
-        let mut t = Vector::new(RingRepresentation::NTT);
+        let mut t: Vector<K> = Vector::new_ntt();
         for (i, ring) in t_slice.chunks(256 * 12).enumerate() {
             t.data[i] = byte_decode::<12>(ring, RingRepresentation::NTT);
         }
@@ -110,7 +112,7 @@ impl<const K: usize> MlKemDeserialize for MlkemDecapsulationKey<{K}> {
         let (ek_slice, rest) = rest.split_at(8*(384 * K + 32));
         let (hash_slice, z_slice) = rest.split_at(8*(32));
 
-        let mut dk_pke = Vector::new(RingRepresentation::NTT);
+        let mut dk_pke = Vector::new_ntt();
         for (i, chunk) in dk_pke_slice.chunks(8*384).enumerate() {
             dk_pke.data[i] = byte_decode::<12>(chunk, RingRepresentation::NTT);
         }
@@ -131,7 +133,7 @@ impl<const K: usize> MlKemDeserialize for MlkemDecapsulationKey<{K}> {
     }
 }
 
-impl<const K: usize, const D_U: usize, const D_V: usize> MlKemSerialize for Cyphertext<{K}, {D_U}, {D_V}> where
+impl<const K: usize, const D_U: usize, const D_V: usize> MlKemSerialize for MlKemCyphertext<{K}, {D_U}, {D_V}> where
     [(); 32*(D_U * K + D_V)]:
 {
     fn serialize(&self) -> BitVec<u8, BitOrder> {
@@ -149,13 +151,13 @@ impl<const K: usize, const D_U: usize, const D_V: usize> MlKemSerialize for Cyph
     }
 }
 
-impl<const K: usize, const D_U: usize, const D_V: usize> MlKemDeserialize for Cyphertext<{K}, {D_U}, {D_V}> {
+impl<const K: usize, const D_U: usize, const D_V: usize> MlKemDeserialize for MlKemCyphertext<{K}, {D_U}, {D_V}> {
     fn deserialize(bitvec: &BitVec<u8, BitOrder>) -> Self {
         assert_eq!(bitvec.len(), 256 * (D_U * K + D_V));
 
         let (c1_slice, c2_slice) = bitvec.split_at(256 * D_U * K);
 
-        let mut c1 = Vector::<K>::new(RingRepresentation::Degree255);
+        let mut c1 = Vector::new_degree255();
         for (i, chunk) in c1_slice.chunks(256 * D_U).enumerate() {
             c1.data[i] = byte_decode::<D_U>(chunk, RingRepresentation::Degree255);
         }

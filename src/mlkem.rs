@@ -41,8 +41,9 @@ pub fn key_gen<PARAMS: MlKemParams> () -> (MlkemEncapsulationKey<{PARAMS::K}>, M
 }
 
 // ML-KEM.Encaps
+pub type MlKemCyphertext<const K: usize, const D_U: usize, const D_V: usize> = kpke::Cyphertext<K, D_U, D_V>;
                                                                                //  Shared Key
-pub fn encaps<PARAMS: MlKemParams>(ek_mlkem: MlkemEncapsulationKey<{PARAMS::K}>) -> ([u8;32], kpke::Cyphertext<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}>) where
+pub fn encaps<PARAMS: MlKemParams>(ek_mlkem: MlkemEncapsulationKey<{PARAMS::K}>) -> ([u8;32], MlKemCyphertext<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}>) where
     [(); 768 * PARAMS::K + 96]: ,
     [(); PARAMS::K]: ,
     [(); 384 * PARAMS::K + 32]: ,
@@ -70,7 +71,7 @@ pub fn encaps<PARAMS: MlKemParams>(ek_mlkem: MlkemEncapsulationKey<{PARAMS::K}>)
 }
 
 // ML-KEM.Decaps
-pub fn decaps<PARAMS: MlKemParams>(c: kpke::Cyphertext<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}>, dk_mlkem: MlkemDecapsulationKey<{PARAMS::K}>) -> [u8; 32] where
+pub fn decaps<PARAMS: MlKemParams>(c: MlKemCyphertext<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}>, dk_mlkem: MlkemDecapsulationKey<{PARAMS::K}>) -> [u8; 32] where
     [(); PARAMS::K]: ,
     [(); 384 * PARAMS::K + 32]: ,
     [(); 32*(PARAMS::D_U * PARAMS::K + PARAMS::D_V)]: ,
@@ -126,7 +127,7 @@ mod tests {
 
         //ML-KEM.Decaps
         let dk = MlkemDecapsulationKey::<{PARAMS::K}>::deserialize(&dk);
-        let c = kpke::Cyphertext::<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}>::deserialize(&c);
+        let c = MlKemCyphertext::<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}>::deserialize(&c);
 
         let key_prime = decaps::<PARAMS>(c, dk);
 

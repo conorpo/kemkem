@@ -25,14 +25,9 @@ impl ToString for Ring {
     }
 }
 
-
 impl Ring {
-    pub fn new(t: RingRepresentation) -> Ring {
-        Ring {
-            data: [0; 256],
-            t: t
-        }
-    }
+    pub const ZEROES_NTT : Ring       = Ring { data: [0; 256], t: RingRepresentation::NTT };
+    pub const ZEROES_DEGREE255 : Ring = Ring { data: [0; 256], t: RingRepresentation::Degree255 };
 
     pub fn scalar_mul(&mut self, value: u16) {
         let val = value as u32;
@@ -164,9 +159,15 @@ pub struct Vector<const K: usize> {
 }
 
 impl<const K: usize> Vector<K> { 
-    pub fn new(t: RingRepresentation) -> Vector<K> {
+    pub fn new_ntt() -> Vector<K> {
         Vector {
-            data: core::array::from_fn(|_| Ring::new(t))
+            data: core::array::from_fn(|_| Ring::ZEROES_NTT)
+        }
+    }
+    
+    pub fn new_degree255() -> Vector<K> {
+        Vector {
+            data: core::array::from_fn(|_| Ring::ZEROES_DEGREE255)
         }
     }
 
@@ -178,7 +179,11 @@ impl<const K: usize> Vector<K> {
     }
 
     pub fn inner_product(mut self, other: Vector<K>) -> Ring {
-        let mut result = Ring::new(self.data[0].t);
+        let mut result = match self.data[0].t {
+            RingRepresentation::Degree255 => Ring::ZEROES_DEGREE255,
+            RingRepresentation::NTT => Ring::ZEROES_NTT
+        };
+
         for i in 0..K {
             result.add(
                 self.data[i].mult( &other.data[i] )
@@ -283,15 +288,27 @@ pub struct Matrix<const K: usize> {
 }
 
 impl<const K: usize> Matrix<K> {
-    pub fn new(t: RingRepresentation) -> Matrix<K> {
+
+    pub fn new_ntt() -> Matrix<K> {
         Matrix {
-            data: core::array::from_fn(|_| core::array::from_fn(|_| Ring::new(t)))
+            data: core::array::from_fn(|_| core::array::from_fn(|_| Ring::ZEROES_NTT))
+        }
+    }
+
+
+    pub fn new_degree255() -> Matrix<K> {
+        Matrix {
+            data: core::array::from_fn(|_| core::array::from_fn(|_| Ring::ZEROES_DEGREE255))
         }
     }
 
     // These matrix operations are only ever done once, so they can be consuming on the matrix
     pub fn right_vector_multiply(mut self, vector: &Vector<K>) -> Vector<K> {
-        let mut result = Vector::new(self.data[0][0].t);
+        debug_assert_eq!(self.data[0][0].t, RingRepresentation::NTT);
+        debug_assert_eq!(vector.data[0].t, RingRepresentation::NTT);
+
+        let mut result = Vector::new_ntt();
+
         for i in 0..K {
             for j in 0..K {
                 result.data[i].add(self.data[i][j].mult(&vector.data[j]));  
@@ -301,7 +318,10 @@ impl<const K: usize> Matrix<K> {
     }
 
     pub fn left_vector_multiply(mut self, vector: &Vector<K>) -> Vector<K> {
-        let mut result = Vector::new(self.data[0][0].t);
+        debug_assert_eq!(self.data[0][0].t, RingRepresentation::NTT);
+        debug_assert_eq!(vector.data[0].t, RingRepresentation::NTT);
+
+        let mut result = Vector::new_ntt();
         for i in 0..K {
             for j in 0..K {
                 result.data[i].add(self.data[j][i].mult(&vector.data[j]));
