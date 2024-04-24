@@ -25,6 +25,18 @@ pub fn fastmodpow(base: u16, exp: u8) -> u16 {
     result as u16
 }
 
+// pub const MONT_R: i32 = 1 << 16; // 65536
+// //pub const MONT_MULT = 20
+
+// pub const BARRET_R : i64 = 1 << 26; // 67108864
+// pub const BARRET_MULT : i64 = 20159;
+
+
+
+// fn barret_reduce(x: u16) -> u16 {
+//     let t =
+// }
+
 #[cfg(test)]
 mod tests {
     use super::*;

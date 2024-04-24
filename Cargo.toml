@@ -7,15 +7,19 @@ license = "MIT"
 repository = "https://github.com/conorpo/kemkem"
 readme = "README.md"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 bitvec = "1.0.1"
 rand = "0.8.5"
 sha3 = "0.10.8"
 
+[dev-dependencies]
+criterion = "0.5.1"
+
+
 [lib]
 crate-type=["lib"]
+
+
 
 [[bin]]
 name = "simulate_with_serialization"
@@ -23,8 +27,7 @@ name = "simulate_with_serialization"
 [[bin]]
 name = "simulate"
 
-[dev-dependencies]
-criterion = "0.5.1"
+
 
 [[bench]]
 name = "benchmark"
@@ -33,6 +36,9 @@ harness = false
 [[bench]]
 name = "768_funcs"
 harness = false
+
+[profile.release]
+debug = true
 
 
 

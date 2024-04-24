@@ -1,5 +1,3 @@
-use sha3::digest::typenum::bit;
-
 use crate::params;
 use crate::util::*;
 
