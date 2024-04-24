@@ -169,7 +169,6 @@ mod test {
         // Fujisaki-Okamoto transformation, turn decryption key into decapsulation
         let decapsulation_key: MlkemDecapsulationKey<{PARAMS::K}> = (dk, encapsulation_key.clone(), hash, z);
 
-        //First bits should be 0001_0111_0000
         println!("ek: {}\ndk: {}", {
             encapsulation_key.serialize().as_raw_slice().iter()
             .map(|byte| format!("{:02X}", byte))
@@ -179,6 +178,7 @@ mod test {
             .map(|byte| format!("{:02X}", byte))
             .collect::<String>()
         });
+        
 
         assert_eq!(encapsulation_key.serialize(), KEYGEN_DEBUG.ek.view_bits::<Lsb0>().to_bitvec());
         assert_eq!(decapsulation_key.serialize(), KEYGEN_DEBUG.dk.view_bits::<Lsb0>().to_bitvec());

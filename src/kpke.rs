@@ -1,3 +1,4 @@
+
 use crate::crypt;
 use crate::params::*;
 use crate::ring::*;
@@ -88,7 +89,7 @@ pub fn encrypt<PARAMS: MlKemParams>(ek_pke: KpkeEncryptionKey<{PARAMS::K}>, m: C
     let mut r: Vector<{PARAMS::K}> = Vector::new_degree255();
     for i in 0..PARAMS::K {
         r.data[i] = sample::sample_poly_cbd::<{PARAMS::ETA_1}>(
-            crypt::prf::<{PARAMS::ETA_1}>(&rand, n)
+            crypt::prf::<{PARAMS::ETA_1}>(&rand, n as u8)
         );
         n += 1;
     }
@@ -97,14 +98,14 @@ pub fn encrypt<PARAMS: MlKemParams>(ek_pke: KpkeEncryptionKey<{PARAMS::K}>, m: C
     let mut e_1: Vector<{PARAMS::K}> = Vector::new_degree255();
     for i in 0..PARAMS::K {
         e_1.data[i] = sample::sample_poly_cbd::<{PARAMS::ETA_2}>(
-            crypt::prf::<{PARAMS::ETA_2}>(&rand, n)
+            crypt::prf::<{PARAMS::ETA_2}>(&rand, n as u8)
         );
         n += 1;
     }
 
     // Error vector to be added to the shared key V (R^T * t) 
     let e_2 = sample::sample_poly_cbd::<{PARAMS::ETA_2}>(
-        crypt::prf::<{PARAMS::ETA_2}>(&rand, n)
+        crypt::prf::<{PARAMS::ETA_2}>(&rand, n as u8)
     );
 
     let r = r.ntt();

@@ -1,6 +1,7 @@
-use sha3::{Sha3_512, Sha3_256, Digest, Shake256, Shake128, digest::{ExtendableOutput, Update, XofReader}, Shake128Reader};
+use sha3::{digest::{core_api::XofReaderCoreWrapper, ExtendableOutput, Update, XofReader}, Digest, Sha3_256, Sha3_512, Shake128ReaderCore, Shake256};
 use rand::{RngCore, SeedableRng};
 use rand::rngs::StdRng;
+
 
 pub fn random_bytes<const N: usize> () -> [u8; N] {
     let mut rng = StdRng::from_entropy();
@@ -32,9 +33,30 @@ pub fn j(s: Vec<u8>) -> [u8; 32] {
     let mut reader = hasher.finalize_xof();
 
     let mut res = [0u8; 32];
-    reader.read(&mut res);
+    XofReader::read(&mut reader, &mut res);
     res
 }
+
+// union U32U8Union {
+//     u32: [u32; 32],
+//     u8: [u8; 128],
+// }
+
+// Optimization Attempt
+// pub fn prf_2(s: &[u8; 32], b: u8) -> [u32; 32]
+// {
+//     let mut hasher = Shake256::default();
+//     hasher.update(s);
+//     hasher.update(&[b]);
+    
+//     let mut reader = hasher.finalize_xof();
+    
+//     let mut res = U32U8Union { u32: [0u32; 32] };
+//     unsafe { 
+//         XofReader::read(&mut reader, &mut res.u8);
+//         res.u32
+//     }
+// }
 
 pub fn prf<const ETA: usize>(s: &[u8; 32], b: u8) -> [u8; 64 * ETA] 
 {
@@ -45,29 +67,26 @@ pub fn prf<const ETA: usize>(s: &[u8; 32], b: u8) -> [u8; 64 * ETA]
     let mut reader = hasher.finalize_xof();
     
     let mut res = [0u8; 64 * ETA];
-    reader.read(&mut res);
+    XofReader::read(&mut reader, &mut res);
     res
 }
 
 
 pub struct XOF {
-    reader: Shake128Reader
+    reader: XofReaderCoreWrapper<Shake128ReaderCore>
 }
 
 impl XOF {
     pub fn new(p: &[u8], i: u8, j: u8) -> XOF {
-        let mut hasher = Shake128::default();
+        let mut hasher = sha3::Shake128::default();
         hasher.update(p);
-        hasher.update(&[i]);
-        hasher.update(&[j]);
+        hasher.update(&[i, j]);
         XOF {
             reader: hasher.finalize_xof()
         }
     }
 
-    pub fn get_3_bytes(&mut self) -> [u8; 3] {
-        let mut res = [0u8; 3];
-        self.reader.read(&mut res);
-        res
+    pub fn get_3_bytes(&mut self, buf: &mut [u8; 3]) {
+        XofReader::read(&mut self.reader, buf);
     }
 }

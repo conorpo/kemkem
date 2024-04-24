@@ -102,11 +102,10 @@ pub fn decaps<PARAMS: MlKemParams>(c: MlKemCyphertext<{PARAMS::K}, {PARAMS::D_U}
 
 
 mod tests {
-    use super::*;
-    use crate::params::*;
-
+    
     #[test]
     fn test_mlkem<>(){
+        use super::*;
         type PARAMS = MlKem512;
 
         //ML-KEM.KeyGen
@@ -115,15 +114,12 @@ mod tests {
         let ek = ek.serialize();
         let dk = dk.serialize();
 
-
-        
         //ML-KEM.Encaps
         let ek = MlkemEncapsulationKey::<{PARAMS::K}>::deserialize(&ek);
         
         let (key, c) = encaps::<PARAMS>(ek);
 
         let c = c.serialize();
-
 
         //ML-KEM.Decaps
         let dk = MlkemDecapsulationKey::<{PARAMS::K}>::deserialize(&dk);

@@ -30,3 +30,9 @@ criterion = "0.5.1"
 name = "benchmark"
 harness = false
 
+[[bench]]
+name = "768_funcs"
+harness = false
+
+
+

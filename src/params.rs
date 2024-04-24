@@ -1,11 +1,8 @@
-/*
-    Loads the correct parameters for the corresponding security level
-*/
-
 pub const N : usize = 256;
 
 pub const Q : u16 = 3329;
 pub const Q32: u32 = 3329;
+pub const Q64: u64 = 3329;
 
 pub const ZETA: u16 = 17;
 

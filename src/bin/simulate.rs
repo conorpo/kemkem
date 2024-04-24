@@ -1,4 +1,5 @@
 //Runs the algorithim one time
+#![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
 
 use kemkem::{mlkem::*, params::*};
@@ -33,6 +34,5 @@ fn simulate<PARAMS: MlKemParams>() where
     let key_prime = decaps::<PARAMS>(c, dk);
 
     assert_eq!(key, key_prime);
-
-    println!("Simulation successful");
+    println!("Success!, Keys match!");
 }

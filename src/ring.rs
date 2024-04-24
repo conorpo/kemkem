@@ -1,6 +1,8 @@
 use crate::params;
 use crate::util::*;
 
+use std::sync::OnceLock;
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum RingRepresentation {
     Degree255,
@@ -24,6 +26,9 @@ impl ToString for Ring {
         s
     }
 }
+
+static ZETA_POWERS_MULT: OnceLock<[u16; 128]> = OnceLock::new();
+static ZETA_POWERS_NTT: OnceLock<[u16; 256]> = OnceLock::new();
 
 impl Ring {
     pub const ZEROES_NTT : Ring       = Ring { data: [0; 256], t: RingRepresentation::NTT };
@@ -59,14 +64,23 @@ impl Ring {
         let a = &mut self.data;
         let b = &other.data;
 
+        let zeta_powers = ZETA_POWERS_MULT.get_or_init(|| {
+            let mut zeta_powers = [0u16; 128];
+            zeta_powers[0] = params::ZETA;
+            for i in 1..128 {
+                zeta_powers[i] = fastmodpow(params::ZETA, 2*bitrev7(i as u8) + 1) as u16;
+            }
+            zeta_powers
+        });
+
         for i in 0usize..128usize {
-            let gamma = fastmodpow(params::ZETA, 2*bitrev7(i as u8) + 1) as u64;
+            let gamma = zeta_powers[i] as u64;
 
             let r_1: u64 = (a[2*i] as u64) * (b[2*i] as u64) + gamma * (a[2*i + 1] as u64) * (b[2*i + 1] as u64); 
             let r_2: u64 = (a[2*i] as u64) * (b[2*i + 1] as u64) + (a[2*i + 1] as u64) * (b[2*i] as u64);
 
-            a[2*i] = (r_1 % params::Q as u64) as u16;
-            a[2*i + 1] = (r_2 % params::Q as u64) as u16;
+            a[2*i] = (r_1 % params::Q64) as u16;
+            a[2*i + 1] = (r_2 % params::Q64) as u16;
         }
 
         self
@@ -76,6 +90,15 @@ impl Ring {
     pub fn ntt(&mut self) -> &mut Self {
         const Q32: u32 = params::Q as u32;
 
+        let zeta_powers = ZETA_POWERS_NTT.get_or_init(|| {
+            let mut zeta_powers = [0u16; 256];
+            zeta_powers[0] = 1;
+            for i in 1..256 {
+                zeta_powers[i] = fastmodpow(params::ZETA, bitrev7(i as u8)) as u16;
+            };
+            zeta_powers
+        });
+
         if let Ring { data, t: RingRepresentation::Degree255 } = self {
             let mut k = 1;
             let mut len = 128;
@@ -83,7 +106,7 @@ impl Ring {
             while len >= 2 {
                 let mut start = 0;
                 while start < 256 {
-                    let zeta = fastmodpow(params::ZETA, bitrev7(k)) as u32;
+                    let zeta = zeta_powers[k] as u32;
 
                     k += 1;
 
@@ -108,13 +131,22 @@ impl Ring {
     }
 
     pub fn inverse_ntt(&mut self) -> &mut Self {
+        let zeta_powers = ZETA_POWERS_NTT.get_or_init(|| {
+            let mut zeta_powers = [0u16; 256];
+            zeta_powers[0] = 1;
+            for i in 1..256 {
+                zeta_powers[i] = fastmodpow(params::ZETA, bitrev7(i as u8)) as u16;
+            };
+            zeta_powers
+        });
+
         if let Ring {  data, t: RingRepresentation::NTT } = self {
             let mut k = 127;
             let mut len = 2;
             while len <= 128 {
                 let mut start = 0;
                 while start < 256 {
-                    let zeta = fastmodpow(params::ZETA, bitrev7(k)) as u32;
+                    let zeta = zeta_powers[k] as u32;
 
                     k -= 1;
 
@@ -292,13 +324,6 @@ impl<const K: usize> Matrix<K> {
     pub fn new_ntt() -> Matrix<K> {
         Matrix {
             data: core::array::from_fn(|_| core::array::from_fn(|_| Ring::ZEROES_NTT))
-        }
-    }
-
-
-    pub fn new_degree255() -> Matrix<K> {
-        Matrix {
-            data: core::array::from_fn(|_| core::array::from_fn(|_| Ring::ZEROES_DEGREE255))
         }
     }
 
