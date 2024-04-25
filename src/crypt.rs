@@ -2,7 +2,6 @@ use sha3::{digest::{core_api::XofReaderCoreWrapper, ExtendableOutput, Update, Xo
 use rand::{RngCore, SeedableRng};
 use rand::rngs::StdRng;
 
-
 pub fn random_bytes<const N: usize> () -> [u8; N] {
     let mut rng = StdRng::from_entropy();
     let mut res = [0u8; N];
@@ -37,10 +36,18 @@ pub fn j(s: Vec<u8>) -> [u8; 32] {
     res
 }
 
-// union U32U8Union {
-//     u32: [u32; 32],
-//     u8: [u8; 128],
-// }
+pub fn prf<const ETA: usize>(s: &[u8; 32], b: u8) -> [u8; 64 * ETA] 
+{
+    let mut hasher = Shake256::default();
+    hasher.update(s);
+    hasher.update(&[b]);
+    
+    let mut reader = hasher.finalize_xof();
+    
+    let mut res = [0u8; 64 * ETA];
+    XofReader::read(&mut reader, &mut res);
+    res
+}
 
 // Optimization Attempt
 // pub fn prf_2(s: &[u8; 32], b: u8) -> [u32; 32]
@@ -58,18 +65,6 @@ pub fn j(s: Vec<u8>) -> [u8; 32] {
 //     }
 // }
 
-pub fn prf<const ETA: usize>(s: &[u8; 32], b: u8) -> [u8; 64 * ETA] 
-{
-    let mut hasher = Shake256::default();
-    hasher.update(s);
-    hasher.update(&[b]);
-    
-    let mut reader = hasher.finalize_xof();
-    
-    let mut res = [0u8; 64 * ETA];
-    XofReader::read(&mut reader, &mut res);
-    res
-}
 
 
 pub struct XOF {

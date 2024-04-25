@@ -60,7 +60,7 @@ const DECAPS_DEBUG: DecapsDebugValues<MlKem1024> = DecapsDebugValues::<MlKem1024
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::mlkem::{MlkemEncapsulationKey, MlkemDecapsulationKey};
+    use crate::mlkem::{MlKemEncapsulationKey, MlKemDecapsulationKey};
     use crate::kpke::{KpkeKeyGenOutput, Cyphertext};
     use crate::serialize::*;
     use crate::crypt;
@@ -73,7 +73,7 @@ mod test {
     type PARAMS = MlKem1024;
 
     #[test]
-    pub fn key_gen<> () {
+    fn key_gen<> () {
         let z = KEYGEN_DEBUG.z;
 
         println!("z: {}", {
@@ -162,12 +162,12 @@ mod test {
         };
        
         // Encapsulation key is the encryption key
-        let encapsulation_key: MlkemEncapsulationKey<{PARAMS::K}> = ek;
+        let encapsulation_key: MlKemEncapsulationKey<{PARAMS::K}> = ek;
 
         let hash = crypt::h(&encapsulation_key.serialize().into_vec());
 
         // Fujisaki-Okamoto transformation, turn decryption key into decapsulation
-        let decapsulation_key: MlkemDecapsulationKey<{PARAMS::K}> = (dk, encapsulation_key.clone(), hash, z);
+        let decapsulation_key: MlKemDecapsulationKey<{PARAMS::K}> = (dk, encapsulation_key.clone(), hash, z);
 
         println!("ek: {}\ndk: {}", {
             encapsulation_key.serialize().as_raw_slice().iter()
@@ -185,7 +185,7 @@ mod test {
     }
 
     #[test]
-    pub fn encaps() {
+    fn encaps() {
         println!("Encapsulation -- ML-KEM-1024");
 
         let m = ENCAPS_DEBUG.m;
@@ -232,7 +232,7 @@ mod test {
         let c = {
             let mut n = 0;
 
-            let (t, rho) = MlkemEncapsulationKey::<{PARAMS::K}>::deserialize(&serialized_ek);
+            let (t, rho) = MlKemEncapsulationKey::<{PARAMS::K}>::deserialize(&serialized_ek);
 
 
             println!("t: {:?}", &t);
@@ -324,8 +324,8 @@ mod test {
     }
 
     #[test]
-    pub fn decaps() {
-        let dk = MlkemDecapsulationKey::<{PARAMS::K}>::deserialize(&DECAPS_DEBUG.dk.view_bits().to_bitvec());
+    fn decaps() {
+        let dk = MlKemDecapsulationKey::<{PARAMS::K}>::deserialize(&DECAPS_DEBUG.dk.view_bits().to_bitvec());
         let c = Cyphertext::<{PARAMS::K}, {PARAMS::D_U}, {PARAMS::D_V}>::deserialize(&DECAPS_DEBUG.c.view_bits().to_bitvec());
 
         let serialized_dk = DECAPS_DEBUG.dk.view_bits::<BitOrder>().to_bitvec(); //For testing

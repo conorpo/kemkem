@@ -1,11 +1,12 @@
 [package]
 name = "kemkem"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "Unverified, unoptimized, and downright dirty implementation of the ML-KEM"
 license = "MIT"
 repository = "https://github.com/conorpo/kemkem"
 readme = "README.md"
+categories = ["cryptography"]
 
 [dependencies]
 bitvec = "1.0.1"
@@ -27,18 +28,9 @@ name = "simulate_with_serialization"
 [[bin]]
 name = "simulate"
 
-
-
-[[bench]]
-name = "benchmark"
-harness = false
-
 [[bench]]
 name = "768_funcs"
 harness = false
-
-[profile.release]
-debug = true
 
 
 

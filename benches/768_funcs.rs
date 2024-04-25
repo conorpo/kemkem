@@ -4,8 +4,6 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 use kemkem::mlkem::*;
 use kemkem::params::*;
-
-use kemkem::serialize::*;
 type PARAMS = MlKem768;
 
 fn bench_keygen(criterion: &mut Criterion) {

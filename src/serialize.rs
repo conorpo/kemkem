@@ -1,5 +1,6 @@
-
-// Handles Compression and Byte Serialization
+//! Trait implementations for serializing and deserializing ML-KEM structs
+//! 
+//! Find examples on how to serialize / deserialize in the repo's or crate's README.md
 use crate::ring::*;
 use crate::mlkem::*;
 use bitvec::prelude::*;
@@ -7,7 +8,8 @@ use bitvec::access::*;
 
 pub type BitOrder = Lsb0;
 
-pub fn byte_encode<const D: usize>(f: &Ring, bitvec_slice: &mut BitSlice<BitSafeU8, BitOrder>) {
+// Writes a wring into a BitSlice, assumes the ring is under modulo 2^D
+fn byte_encode<const D: usize>(f: &Ring, bitvec_slice: &mut BitSlice<BitSafeU8, BitOrder>) {
     assert_eq!(bitvec_slice.len(), 256 * D);
 
     for (slot, ele) in bitvec_slice.chunks_mut(D).zip(f.data.iter()) {
@@ -15,7 +17,8 @@ pub fn byte_encode<const D: usize>(f: &Ring, bitvec_slice: &mut BitSlice<BitSafe
     }
 }
 
-pub fn byte_decode<const D: usize>(bitvec_slice: &BitSlice<u8, BitOrder>, t: RingRepresentation) -> Ring {
+// Reads a BitSlice into a Ring, D bits per element
+fn byte_decode<const D: usize>(bitvec_slice: &BitSlice<u8, BitOrder>, t: RingRepresentation) -> Ring {
     let mut f = match t {
         RingRepresentation::NTT => Ring::ZEROES_NTT,
         RingRepresentation::Degree255 => Ring::ZEROES_DEGREE255
@@ -28,6 +31,7 @@ pub fn byte_decode<const D: usize>(bitvec_slice: &BitSlice<u8, BitOrder>, t: Rin
     }
     f
 }
+
 pub trait MlKemSerialize {
     fn serialize(&self) -> BitVec<u8, BitOrder>;
 }
@@ -36,8 +40,7 @@ pub trait MlKemDeserialize {
     fn deserialize(bitvec: &BitVec<u8, BitOrder>) -> Self;
 }
 
-
-impl<const K: usize> MlKemSerialize for MlkemEncapsulationKey<{K}> {
+impl<const K: usize> MlKemSerialize for MlKemEncapsulationKey<{K}> {
     fn serialize(&self) -> BitVec<u8, BitOrder> {
         let mut bitvec = bitvec![u8, BitOrder; 0; 8 * (384 * K + 32)];
 
@@ -56,7 +59,7 @@ impl<const K: usize> MlKemSerialize for MlkemEncapsulationKey<{K}> {
     }
 }
 
-impl<const K: usize> MlKemDeserialize for MlkemEncapsulationKey<{K}> {
+impl<const K: usize> MlKemDeserialize for MlKemEncapsulationKey<{K}> {
     fn deserialize(bitvec: &BitVec<u8, BitOrder>) -> Self {
         let (t_slice, rho_slice) = bitvec.split_at(256 * 12 * K);
 
@@ -74,7 +77,7 @@ impl<const K: usize> MlKemDeserialize for MlkemEncapsulationKey<{K}> {
     }
 }
 
-impl<const K: usize> MlKemSerialize for MlkemDecapsulationKey<{K}> {
+impl<const K: usize> MlKemSerialize for MlKemDecapsulationKey<{K}> {
     fn serialize(&self) -> BitVec<u8, BitOrder> {
         let mut bitvec = bitvec![u8, BitOrder; 0; 8*(768 * K + 96)];
         let (dk_pke_slice, rest) = bitvec.split_at_mut(8*(384 * K));
@@ -106,7 +109,7 @@ impl<const K: usize> MlKemSerialize for MlkemDecapsulationKey<{K}> {
     }
 }
 
-impl<const K: usize> MlKemDeserialize for MlkemDecapsulationKey<{K}> {
+impl<const K: usize> MlKemDeserialize for MlKemDecapsulationKey<{K}> {
     fn deserialize(bitvec: &BitVec<u8, BitOrder>) -> Self {
         let (dk_pke_slice, rest) = bitvec.split_at(8*(384 * K));
         let (ek_slice, rest) = rest.split_at(8*(384 * K + 32));
@@ -117,7 +120,7 @@ impl<const K: usize> MlKemDeserialize for MlkemDecapsulationKey<{K}> {
             dk_pke.data[i] = byte_decode::<12>(chunk, RingRepresentation::NTT);
         }
 
-        let ek = MlkemEncapsulationKey::<{K}>::deserialize(&BitVec::from_bitslice(ek_slice));
+        let ek = MlKemEncapsulationKey::<{K}>::deserialize(&BitVec::from_bitslice(ek_slice));
 
         let mut hash = [0u8; 32];
         for (i, byte) in hash_slice.chunks(8).enumerate() {

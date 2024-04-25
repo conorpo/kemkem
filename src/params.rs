@@ -1,11 +1,19 @@
+//! Parameter Sets and Constants
+//! 
+//! - **ML-KEM-512**: K = 2, ETA_1 = 3, ETA_2 = 2, D_U = 10, D_V = 4
+//! - **ML-KEM-768**: K = 3, ETA_1 = 2, ETA_2 = 2, D_U = 10, D_V = 4
+//! - **ML-KEM-1024**: K = 4, ETA_1 = 2, ETA_2 = 2, D_U = 11, D_V = 5
+//! 
+//! *Constants are only used internally, but N represents the size of a ring (256 elements), Q is the prime modulus (3329), ZETA is the primitive root of unity (17)*
 pub const N : usize = 256;
-
 pub const Q : u16 = 3329;
 pub const Q32: u32 = 3329;
 pub const Q64: u64 = 3329;
-
 pub const ZETA: u16 = 17;
 
+/// Trait for adding parameter values to the 3 parameter set structs.
+/// 
+/// You can make new functions generic over all 3 parameter sets by using this trait as a bound.
 pub trait MlKemParams {
     const K: usize;
     const ETA_1: usize;

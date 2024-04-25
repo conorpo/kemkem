@@ -34,7 +34,25 @@ pub fn sample_ntt(mut xof_stream: crypt::XOF) -> Ring {
     ring
 }
 
+pub fn sample_poly_cbd<const ETA: usize>(byte_array: [u8; 64*ETA]) -> Ring 
+{
+    let b = byte_array.view_bits::<Lsb0>();
+    let mut f: Ring = Ring::ZEROES_DEGREE255;
 
+    for i in 0..256 {
+        let mut x = 0u16;
+        let mut y = 0u16;
+
+        for j in 0..ETA {
+            x += b[i*2*ETA + j] as u16;
+            y += b[i*2*ETA + j + ETA] as u16;
+        }
+
+        f.data[i] = (x + params::Q - y) % params::Q;
+    }
+
+    f
+}
 
 // Optimization Attempt
 // pub fn sample_poly_cbd_2(u32_random_array: [u32; 32]) -> Ring {
@@ -72,23 +90,3 @@ pub fn sample_ntt(mut xof_stream: crypt::XOF) -> Ring {
 
 //     f
 // }
-
-pub fn sample_poly_cbd<const ETA: usize>(byte_array: [u8; 64*ETA]) -> Ring 
-{
-    let b = byte_array.view_bits::<Lsb0>();
-    let mut f: Ring = Ring::ZEROES_DEGREE255;
-
-    for i in 0..256 {
-        let mut x = 0u16;
-        let mut y = 0u16;
-
-        for j in 0..ETA {
-            x += b[i*2*ETA + j] as u16;
-            y += b[i*2*ETA + j + ETA] as u16;
-        }
-
-        f.data[i] = (x + params::Q - y) % params::Q;
-    }
-
-    f
-}
