@@ -1,12 +1,13 @@
 [package]
 name = "kemkem"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 description = "Unverified, unoptimized, and downright dirty implementation of the ML-KEM"
 license = "MIT"
 repository = "https://github.com/conorpo/kemkem"
 readme = "README.md"
 categories = ["cryptography"]
+documentation = "https://docs.rs/kemkem"
 
 [dependencies]
 bitvec = "1.0.1"
