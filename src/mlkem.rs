@@ -121,13 +121,11 @@ pub fn decaps<PARAMS: MlKemParams>(c: MlKemCyphertext<{PARAMS::K}, {PARAMS::D_U}
 
     let (key, rand) = crypt::g::<64>(&combined);
 
-    let key_reject = crypt::j([&z, c.serialize().as_raw_slice()].concat());
-
     let c_prime = kpke::encrypt::<PARAMS>(ek, m, rand); // Should be same as encaps
 
     match (c.0 == c_prime.0) && (c.1 == c_prime.1) {
         true => key,
-        false => key_reject
+        false => crypt::j([&z, c.serialize().as_raw_slice()].concat())
     }
 }
 

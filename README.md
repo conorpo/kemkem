@@ -74,9 +74,9 @@ let (ek, dk) = match param_set {
 For the MlKem768 parameter set:
 | Step | Time (µs) |
 |---------------|-------------|
-| `KeyGen`      | `78.3`   |   
-|`Encaps`| `82.2`|
-|`Decaps`| `104.7` |
+| `KeyGen`      | `70.157`   |   
+|`Encaps`| `76.056`|
+|`Decaps`| `65.585` |
 *Without Serialization
 
-This was run on my AMD Ryzen 7 1700X, and can be replicated with `cargo bench`. I've decided not to include other implementations in the table, as I am new to rust and can't ensure I've set up a fair comparison. But running `libcrux`'s ML-KEM-768 benchmark on my machine I got very similair times except for Decaps which ran in `~70µs`.
+This was run on my AMD Ryzen 7 1700X, and can be replicated with `cargo bench`. I've decided not to include other implementations in the table, as I am new to rust and can't ensure I've set up a fair comparison. But running `libcrux`'s ML-KEM-768 benchmark on my machine I got very similair times.
