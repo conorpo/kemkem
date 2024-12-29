@@ -1,6 +1,6 @@
 [package]
 name = "kemkem"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 description = "Unverified, unoptimized, and downright dirty implementation of the ML-KEM"
 license = "MIT"
