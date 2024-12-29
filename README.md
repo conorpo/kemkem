@@ -4,7 +4,7 @@
 - [docs.rs](https://docs.rs/kemkem)
 
 
-A rust implementation of **ML-KEM**, **M**odular **L**attice-based **K**ey **E**ncapsulation **M**echanism. This is a post-quantum assymetric encryption scheme for sharing keys, and its difficulty is based on the hardness of the Modular Learning With Errors (M-LWE) problem.
+A rust implementation of **ML-KEM**, **M**odular **L**attice-based **K**ey **E**ncapsulation **M**echanism. This is a post-quantum assymetric encryption scheme for sharing keys, and its difficulty is based on the hardness of the Modular Learning With Errors (M-LWE) problem. This implementation is based-on and compliant with [FIPS 203](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.203.ipd.pdf), this NIST winner for a post-quantum Key Encapsulation mechanism.
 
 It features:
 - An intuitive API, where parameters are deobfuscated and serialization is handled explicitly
